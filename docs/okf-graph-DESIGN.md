@@ -54,7 +54,9 @@ this note wins and `deon` stays as it is.
 A **Concept** is one markdown document, read as a `Frontmatter` block and a
 `Body` ([§4]). The body is an _opaque payload_ this crate never interprets.
 
-Identity is **bundle-owned**. A Concept ID is the concept file's path within the bundle with the `.md` suffix removed ([§2]) — the file `tables/orders.md` has Concept ID `tables/orders`.
+Identity is **bundle-owned**. A Concept ID is the concept file's path within the
+bundle with the `.md` suffix removed ([§2]) — the file `tables/orders.md` has
+Concept ID `tables/orders`.
 
 A **Bundle** is the set of concepts a directory tree yields, plus the reserved
 files that are _not_ concepts — `index.md` and `log.md`, which carry defined
