@@ -28,9 +28,9 @@ and both are load-bearing:
   fully conformant and wrong; expert review is that gate, and `okf-graph` does
   not stand in for it.
 - **Topology is not meaning.** `okf-graph` reads _that_ one concept points at
-  another, never _what_ the relationship means. OKF links are untyped (§6), and
-  the meaning of a norm — obligation, defeat, the mechanical/judgment seam — is
-  `okf-normative`'s to read, one layer up.
+  another, never _what_ the relationship means. OKF links are untyped ([§6]),
+  and the meaning of a norm — obligation, defeat, the mechanical/judgment seam —
+  is `okf-normative`'s to read, one layer up.
 
 ## 2. Placement and the boundary
 
@@ -52,79 +52,79 @@ this note wins and `deon` stays as it is.
 ## 3. The model
 
 A **Concept** is one markdown document, read as a `Frontmatter` block and a
-`Body` — the two parts SPEC §4 defines, and the whole of what a concept is
-(shipped in #36). The body is an _opaque payload_, for the reason §1 gives.
+`Body` ([§4]). The body is an _opaque payload_ this crate never interprets.
 
 Identity is **bundle-owned**. A Concept ID is the concept file's path within the
-bundle with the `.md` suffix removed (§2) — the file `tables/orders.md` has
+bundle with the `.md` suffix removed ([§2]) — the file `tables/orders.md` has
 Concept ID `tables/orders`. It is assigned by whatever loads the bundle, never
 derived by a `Concept` from the filesystem: a document read on its own has no
 bundle to be relative to, and reconstructing an id from an absolute path would
 let two clones of the same bundle disagree about identity. This is why #36 kept
 the id off the `Concept` type. A bundle-relative link `/tables/orders.md`
-normalises to that same Concept ID, which is what makes link resolution (§6, a
+normalises to that same Concept ID, which is what makes link resolution ([§6], a
 later child) a lookup rather than a guess.
 
 A **Bundle** is the set of concepts a directory tree yields, plus the reserved
 files that are _not_ concepts — `index.md` and `log.md`, which carry defined
-meaning at any level (§3.1) and are validated as structures of their own rather
-than read as concepts.
+meaning at any level ([§3.1]) and are validated as structures of their own
+rather than read as concepts.
 
 ## 4. Edges: kind by origin
 
-OKF links carry no type. §6 is explicit: the kind of relationship "is conveyed
-by the surrounding prose, not by the link itself," and a consumer "typically
-treat[s] all links as directed edges of an untyped relationship." So `okf-graph`
-does not read a link's _meaning_ — that is §1's "topology is not meaning."
+OKF links carry no type: the kind of relationship "is conveyed by the
+surrounding prose, not by the link itself" ([§6]).
 
 But a bundle _does_ carry structurally distinct kinds of reference, and the
 distinction comes from **where a reference sits, not from any link syntax**. An
 edge takes its kind from its origin field:
 
-- **body-link** — a markdown link in a concept body (§6.1): the untyped
+- **body-link** — a markdown link in a concept body ([§6.1]): the untyped
   relationship edge, the one the spec describes.
-- **parent/child** — implicit in the directory tree (§3): not a link at all, but
-  a real structural edge between a concept and its enclosing scope.
-- **resource** — a concept's `resource` (§4.1): the external or internal asset
+- **parent/child** — implicit in the directory tree ([§3]): not a link at all,
+  but a real structural edge between a concept and its enclosing scope.
+- **resource** — a concept's `resource` ([§4.1]): the external or internal asset
   the concept is _about_.
-- **sources[].resource** — provenance (§5.1): where a concept's content derives
-  from; a derivation edge when it points at another concept.
+- **sources[].resource** — provenance ([§5.1]): where a concept's content
+  derives from; a derivation edge when it points at another concept.
 - **computation / executor.resource / attester.resource** — the path edges of an
-  Attested Computation (§10).
+  Attested Computation ([§10]).
 
-The algebra differs by kind, which is why properties are checked **per edge
-kind, not over the graph as a whole**: parent/child is a tree, acyclic by
-construction; derivation (§5.1) must not cycle, or credibility propagation would
-not terminate; body-links may cycle harmlessly, and are even allowed to dangle
-(§6); `resource` and the §10 path edges are many-to-one. A single global
-acyclicity rule would reject a correct bundle.
-
-This corrects the crate's original `lib.rs` header, which framed the same
-per-kind insight with the wrong taxonomy — it named
-decomposition/supersedes/cites/see-also, link _meanings_ borrowed from `deon`'s
-normative reading. OKF links carry no such labels; the kinds above are the ones
-the format actually distinguishes. Child 4 rewrites the header to match.
+Properties are checked **per edge kind, not over the graph as a whole** because
+the algebra is different for each: parent/child is a tree, acyclic by
+construction; derivation ([§5.1]) must not cycle, or credibility propagation
+would not terminate; body-links may cycle harmlessly, and are even allowed to
+dangle ([§6]); `resource` and the [§10] path edges are many-to-one. A single
+global acyclicity rule would reject a correct bundle.
 
 ## 5. Severity: defect vs tolerated report
 
 A finding is either a **defect** to fix or a **report** about something the spec
-says to tolerate. `okf-graph` reuses the _shape_ of `deon`'s `Severity`
-(`Defect` / `Report`) without depending on `deon-check`.
+says to tolerate.
 
 The distinction is the spec's, not an ergonomic nicety. OKF's consumption model
-is permissive (§11) and names cases a consumer **MUST NOT** reject over:
+is permissive ([§11]) and names cases a consumer **MUST NOT** reject over:
 
-- a **dangling link** — §6 requires tolerating a broken link, which "may simply
-  represent not-yet-written knowledge";
-- a **missing optional family** — §5.3 / §11 forbid rejecting a concept for
+- a **dangling link** — [§6] requires tolerating a broken link, which "may
+  simply represent not-yet-written knowledge";
+- a **missing optional family** — [§5.3] / [§11] forbid rejecting a concept for
   lacking provenance, trust, or lifecycle metadata.
 
-These are _reports_: surfaced and printed so nothing is silently dropped, but
-they do not fail a run. Malformed structure and missing _required_ fields — no
-`type` (§11), a `sources` entry with no `resource` (§5.1), `generated` with no
-`by` (§5.2) — are _defects_. Collapsing the two would make a fully conformant
-bundle fail the checker, which is the one thing a conformance checker must never
-do: failing what the spec says to tolerate is a bug, not strictness.
+These are _reports_: surfaced and printed so nothing is silently dropped.
+Malformed structure and missing _required_ fields — no `type` ([§11]), a
+`sources` entry with no `resource` ([§5.1]), or `generated` with no `by`
+([§5.2]) — are _defects_.
 
 [okf-spec]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md
 [board]: https://github.com/orgs/ojhermann-org/projects/8
+[§2]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md#2-terminology
+[§3]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md#3-bundle-structure
+[§3.1]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md#31-reserved-filenames
+[§4]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md#4-concept-documents
+[§4.1]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md#41-frontmatter
+[§5.1]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md#51-provenance-sources
+[§5.2]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md#52-trust-generated-and-verified
+[§5.3]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md#53-trust-tiers
+[§6]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md#6-cross-linking-and-paths
+[§6.1]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md#61-links-between-concepts
+[§10]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md#10-attested-computations-concept
+[§11]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md#11-conformance
