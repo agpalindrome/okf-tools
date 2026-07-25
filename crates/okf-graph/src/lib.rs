@@ -26,5 +26,7 @@
 //! [`okf-normative`]: https://github.com/ojhermann-org/okf-tools
 
 mod concept;
+mod finding;
 
 pub use concept::{Body, Concept, ConceptError, Frontmatter};
+pub use finding::{Finding, Rule, Severity};
