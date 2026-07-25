@@ -54,15 +54,7 @@ this note wins and `deon` stays as it is.
 A **Concept** is one markdown document, read as a `Frontmatter` block and a
 `Body` ([§4]). The body is an _opaque payload_ this crate never interprets.
 
-Identity is **bundle-owned**. A Concept ID is the concept file's path within the
-bundle with the `.md` suffix removed ([§2]) — the file `tables/orders.md` has
-Concept ID `tables/orders`. It is assigned by whatever loads the bundle, never
-derived by a `Concept` from the filesystem: a document read on its own has no
-bundle to be relative to, and reconstructing an id from an absolute path would
-let two clones of the same bundle disagree about identity. This is why #36 kept
-the id off the `Concept` type. A bundle-relative link `/tables/orders.md`
-normalises to that same Concept ID, which is what makes link resolution ([§6], a
-later child) a lookup rather than a guess.
+Identity is **bundle-owned**. A Concept ID is the concept file's path within the bundle with the `.md` suffix removed ([§2]) — the file `tables/orders.md` has Concept ID `tables/orders`.
 
 A **Bundle** is the set of concepts a directory tree yields, plus the reserved
 files that are _not_ concepts — `index.md` and `log.md`, which carry defined
