@@ -72,6 +72,14 @@ pub struct Finding {
 }
 
 impl Finding {
+    pub(crate) fn new(file: impl Into<String>, rule: Rule, detail: impl Into<String>) -> Self {
+        Finding {
+            file: file.into(),
+            rule,
+            detail: detail.into(),
+        }
+    }
+
     /// The finding's severity, from its rule.
     pub fn severity(&self) -> Severity {
         self.rule.severity()
@@ -115,11 +123,7 @@ mod tests {
 
     #[test]
     fn display_locates_the_file_then_names_the_rule() {
-        let finding = Finding {
-            file: "tables/orders.md".to_string(),
-            rule: Rule::MissingType,
-            detail: "no `type`".to_string(),
-        };
+        let finding = Finding::new("tables/orders.md", Rule::MissingType, "no `type`");
         assert_eq!(
             finding.to_string(),
             "tables/orders.md\tCONCEPT-2 (missing type): no `type`"

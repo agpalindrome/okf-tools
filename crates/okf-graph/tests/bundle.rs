@@ -3,7 +3,7 @@
 
 use std::path::PathBuf;
 
-use okf_graph::Bundle;
+use okf_graph::{Bundle, Rule};
 
 fn fixture(name: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -47,4 +47,29 @@ fn a_clean_bundle_reports_nothing() {
         "expected no findings, got: {:?}",
         bundle.findings()
     );
+}
+
+/// A `.md` that does not parse as a concept is not added to the bundle, and is
+/// reported as CONCEPT-1 located at its file.
+#[test]
+fn an_unparseable_file_is_not_a_concept_and_is_reported() {
+    let bundle = Bundle::load(&fixture("unreadable")).expect("loads");
+
+    assert!(bundle.is_empty(), "the prose-only file is not a concept");
+    assert_eq!(bundle.findings().len(), 1);
+    assert_eq!(bundle.findings()[0].rule, Rule::NotAConcept);
+    assert_eq!(bundle.findings()[0].file, "prose-only.md");
+}
+
+/// A concept with no `type` still has identity and is loaded, but is reported as
+/// CONCEPT-2 — a defect to fix, not a reason to drop the concept.
+#[test]
+fn a_typeless_concept_is_loaded_but_reported() {
+    let bundle = Bundle::load(&fixture("missing-type")).expect("loads");
+
+    assert_eq!(bundle.len(), 1);
+    assert!(bundle.concept("untyped").is_some());
+    assert_eq!(bundle.findings().len(), 1);
+    assert_eq!(bundle.findings()[0].rule, Rule::MissingType);
+    assert_eq!(bundle.findings()[0].file, "untyped.md");
 }
