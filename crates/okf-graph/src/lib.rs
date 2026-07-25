@@ -11,11 +11,13 @@
 //! test for it: **if this crate's test suite cannot be read by someone who has
 //! never heard of deontic logic, the boundary is not real.**
 //!
-//! Graph properties are checked **per link label**, not per graph. A Link may
-//! carry more than one meaning, and the algebra differs by meaning: decomposition
-//! must be acyclic, "supersedes" forms chains, "cites" is many-to-one by design,
-//! "see also" may cycle harmlessly. A global acyclicity rule would reject a
-//! correct Bundle.
+//! Graph properties are checked **per edge kind, not over the whole graph**.
+//! OKF links carry no type (SPEC §6): an edge takes its kind from where the
+//! reference sits — a body-link, a `resource`, a `sources` entry, the
+//! parent/child of the directory tree, an Attested-Computation path — and the
+//! algebra differs by kind (parent/child is a tree, derivation must not cycle,
+//! body-links may cycle harmlessly). A single global acyclicity rule would
+//! reject a correct Bundle. See `docs/okf-graph-DESIGN.md` for the model.
 //!
 //! So far this crate models the unit the graph is made of: an OKF
 //! [`Concept`] — one markdown document, read as a [`Frontmatter`] block and a
