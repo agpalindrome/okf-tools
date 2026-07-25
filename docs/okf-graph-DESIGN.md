@@ -105,15 +105,13 @@ is permissive ([§11]) and names cases a consumer **MUST NOT** reject over:
 
 These are _reports_: surfaced and printed so nothing is silently dropped.
 Malformed structure and missing _required_ fields — no `type` ([§11]), a
-`sources` entry with no `resource` ([§5.1]), or `generated` with no `by`
+`sources` entry with no `resource` ([§5.1]), `generated` with no `by`
 ([§5.2]) — are _defects_.
 
 ## 6. What is checked
 
 Every rule the spec makes checkable ships as a located finding — a defect or a
-tolerated report. This section is the shape, not the registry: the living list
-is the epic's sub-issues (#40–#48) and the `Rule` enum in code, where a check is
-added or changed. Re-enumerating it here would only drift.
+tolerated report. This section is the shape, not the registry.
 
 **Per-concept** reads a single document against [§4]'s shape and the optional
 families: `type` present and non-empty ([§11]); the field shapes of [§4.1]; the
@@ -134,12 +132,10 @@ the reserved `index.md` and `log.md` ([§8], [§9]), including a declared
 
 Out of scope here, by the layer boundary or by the nature of the problem:
 
-- **Meaning** — the normative reading (colors, norms, the seam) is
-  `okf-normative`'s, downstream. No evaluation engine, bespoke syntax, or neural
-  component belongs in this crate (`CLAUDE.md`, "Deletion & creation").
+- **Meaning** — is downstream. No evaluation engine, bespoke syntax, or neural
+  component belongs in this crate.
 - **Fidelity** — whether a bundle faithfully encodes the standard it claims is
-  not machine-checkable; expert review is that gate, as this note's purpose
-  states.
+  not machine-checkable; expert review is that gate.
 
 [okf-spec]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md
 [board]: https://github.com/orgs/ojhermann-org/projects/8
