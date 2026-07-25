@@ -108,6 +108,39 @@ Malformed structure and missing _required_ fields — no `type` ([§11]), a
 `sources` entry with no `resource` ([§5.1]), or `generated` with no `by`
 ([§5.2]) — are _defects_.
 
+## 6. What is checked
+
+Every rule the spec makes checkable ships as a located finding — a defect or a
+tolerated report. This section is the shape, not the registry: the living list
+is the epic's sub-issues (#40–#48) and the `Rule` enum in code, where a check is
+added or changed. Re-enumerating it here would only drift.
+
+**Per-concept** reads a single document against [§4]'s shape and the optional
+families: `type` present and non-empty ([§11]); the field shapes of [§4.1]; the
+provenance, trust, and lifecycle families ([§5]) — a `sources` entry's required
+`resource`, the `verified` singleton that counts as one and not zero ([§5.2]),
+the actor convention ([§7]), and `status` / `stale_after` ([§5.4], [§5.5]); and
+the Attested-Computation contract ([§10]) — `runtime`, typed `parameters`, and
+the computation-or-fence exclusivity ([§10.3]).
+
+**Whole-bundle** reads the graph: unique Concept IDs and reserved-file exclusion
+([§3.1]); body-link resolution with dangling links tolerated ([§6]); the
+path-valued fields ([§6.2]) and the `references/` convention ([§6.3]); the
+provenance and derivation graph and its cycles ([§5.1]); and the structure of
+the reserved `index.md` and `log.md` ([§8], [§9]), including a declared
+`okf_version` ([§12]).
+
+## 7. Deferred
+
+Out of scope here, by the layer boundary or by the nature of the problem:
+
+- **Meaning** — the normative reading (colors, norms, the seam) is
+  `okf-normative`'s, downstream. No evaluation engine, bespoke syntax, or neural
+  component belongs in this crate (`CLAUDE.md`, "Deletion & creation").
+- **Fidelity** — whether a bundle faithfully encodes the standard it claims is
+  not machine-checkable; expert review is that gate, as this note's purpose
+  states.
+
 [okf-spec]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md
 [board]: https://github.com/orgs/ojhermann-org/projects/8
 [§2]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md#2-terminology
@@ -115,10 +148,20 @@ Malformed structure and missing _required_ fields — no `type` ([§11]), a
 [§3.1]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md#31-reserved-filenames
 [§4]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md#4-concept-documents
 [§4.1]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md#41-frontmatter
+[§5]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md#5-provenance-trust-and-lifecycle
 [§5.1]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md#51-provenance-sources
 [§5.2]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md#52-trust-generated-and-verified
 [§5.3]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md#53-trust-tiers
+[§5.4]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md#54-lifecycle-status
+[§5.5]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md#55-lifecycle-stale_after
 [§6]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md#6-cross-linking-and-paths
 [§6.1]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md#61-links-between-concepts
+[§6.2]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md#62-path-valued-fields
+[§6.3]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md#63-the-references-convention
+[§7]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md#7-actor-convention
+[§8]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md#8-index-files
+[§9]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md#9-log-files
 [§10]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md#10-attested-computations-concept
+[§10.3]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md#103-the-computation
 [§11]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md#11-conformance
+[§12]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md#12-versioning
