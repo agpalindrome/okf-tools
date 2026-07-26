@@ -63,10 +63,13 @@ code block's style — so both a fenced and an indented computation count as
 inline. It does not yet inspect the block's contents (deferred, #58).
 
 **The question for upstream.** Should §10.3 say "a fenced *or indented* code
-block," or should §10.2's example be changed to a fenced block? Not yet raised —
-holding to batch with the actor-convention item (#234) or a later one.
+block," or should §10.2's example be changed to a fenced block?
+
+**Raised upstream** 2026-07-26 as
+[GoogleCloudPlatform/knowledge-catalog#235][issue-235].
 
 [issue]: https://github.com/GoogleCloudPlatform/knowledge-catalog/issues/234
+[issue-235]: https://github.com/GoogleCloudPlatform/knowledge-catalog/issues/235
 [s7]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md#7-actor-convention
 [s51]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md#51-provenance-sources
 [s102]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md#102-contract-fields
