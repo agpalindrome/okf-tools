@@ -8,9 +8,11 @@
 //! (§3.1); their own structure is validated elsewhere.
 
 use std::collections::btree_map::{BTreeMap, Entry};
+use std::collections::BTreeSet;
 use std::path::Path;
 
 use crate::links::{links_in, Link, LinkKind};
+use crate::paths::{classify_path, resolve_path, PathKind};
 use crate::{Concept, Finding, Rule};
 
 /// A resolved body-link edge: the linking concept points at another concept in
@@ -29,6 +31,7 @@ pub struct BodyLink {
 #[derive(Debug, Clone, Default)]
 pub struct Bundle {
     concepts: BTreeMap<String, Concept>,
+    files: BTreeSet<String>,
     links: Vec<BodyLink>,
     findings: Vec<Finding>,
 }
@@ -44,6 +47,7 @@ impl Bundle {
         let mut bundle = Bundle::default();
         collect(root, root, &mut bundle)?;
         bundle.resolve_links();
+        bundle.resolve_paths();
         Ok(bundle)
     }
 
@@ -160,6 +164,38 @@ impl Bundle {
         self.links = edges;
         self.findings.extend(findings);
     }
+
+    /// Resolve each concept's path-valued fields (§6.2) against the file set: a
+    /// bundle-path or relative target that names no file is a dangling
+    /// `BUNDLE-3` report. URLs and `sources` scope descriptors are not paths and
+    /// are left alone.
+    fn resolve_paths(&mut self) {
+        let mut findings = Vec::new();
+        for (id, concept) in &self.concepts {
+            let fm = concept.frontmatter();
+            let mut check = |field: &str, value: Option<&str>, allow_scope: bool| {
+                if let Some(value) = value {
+                    check_path(id, field, value, allow_scope, &self.files, &mut findings);
+                }
+            };
+            check("resource", fm.resource(), false);
+            check("computation", fm.computation(), false);
+            for (i, source) in fm.sources().iter().enumerate() {
+                check(
+                    &format!("sources[{i}].resource"),
+                    source.resource.as_deref(),
+                    true,
+                );
+            }
+            if let Some(executor) = fm.executor() {
+                check("executor.resource", executor.resource.as_deref(), false);
+            }
+            if let Some(attester) = fm.attester() {
+                check("attester.resource", attester.resource.as_deref(), false);
+            }
+        }
+        self.findings.extend(findings);
+    }
 }
 
 /// Recurse `path`, adding every non-reserved `*.md` to `out` as a concept.
@@ -176,20 +212,25 @@ fn collect(root: &Path, path: &Path, out: &mut Bundle) -> std::io::Result<()> {
         for entry in entries {
             collect(root, &entry, out)?;
         }
-    } else if is_markdown(path) && !is_reserved(path) {
+    } else {
+        // Record every file so a path-valued field (§6.2) can resolve against
+        // the whole tree, not only the concepts. Reserved and non-`.md` files
+        // are targets too (`references/foo.py`, `/log.md`).
         let file = rel_path(root, path);
-        let text = std::fs::read_to_string(path)?;
-        match Concept::parse(&text) {
-            Ok(concept) => {
-                out.findings.extend(check_concept(&file, &concept));
-                let id = strip_md(&file);
-                out.add_concept(id, file, concept);
+        out.files.insert(file.clone());
+        if is_markdown(path) && !is_reserved(path) {
+            let text = std::fs::read_to_string(path)?;
+            match Concept::parse(&text) {
+                Ok(concept) => {
+                    out.findings.extend(check_concept(&file, &concept));
+                    out.add_concept(strip_md(&file), file, concept);
+                }
+                Err(err) => out.findings.push(Finding::new(
+                    file,
+                    Rule::NotAConcept,
+                    format!("not a concept document: {err}"),
+                )),
             }
-            Err(err) => out.findings.push(Finding::new(
-                file,
-                Rule::NotAConcept,
-                format!("not a concept document: {err}"),
-            )),
         }
     }
     Ok(())
@@ -355,37 +396,50 @@ fn strip_md(file: &str) -> String {
     file.strip_suffix(".md").unwrap_or(file).to_string()
 }
 
+/// A `BUNDLE-3` finding when a path-valued field names a bundle file that is
+/// not present. Only bundle-path and relative targets are checked; a URL or a
+/// `sources` scope descriptor is not a path and is skipped. Empty values are
+/// skipped too.
+fn check_path(
+    from: &str,
+    field: &str,
+    value: &str,
+    allow_scope: bool,
+    files: &BTreeSet<String>,
+    findings: &mut Vec<Finding>,
+) {
+    if value.trim().is_empty() {
+        return;
+    }
+    match classify_path(value, allow_scope) {
+        PathKind::BundlePath | PathKind::Relative => {
+            if !files.contains(&resolve_path(from, value)) {
+                findings.push(Finding::new(
+                    format!("{from}.md"),
+                    Rule::DanglingPath,
+                    format!("`{field}` path `{value}` resolves to no file in the bundle"),
+                ));
+            }
+        }
+        PathKind::Url | PathKind::ScopeDescriptor => {}
+    }
+}
+
 /// The Concept ID a body link points at, or `None` when the link cannot name a
 /// concept (external, a bare fragment, or a target that is not a `.md` file).
 ///
-/// A bundle-absolute target resolves from the root; a relative one from the
-/// linking concept's directory, applying `.`/`..` (`..` past the root is
-/// clamped). The `#fragment` is dropped before resolving.
+/// Shares [`resolve_path`] with the path-valued fields for the `.`/`..`
+/// normalisation, then strips the `.md` a concept link must carry.
 fn resolve_concept_target(from: &str, link: &Link) -> Option<String> {
-    let mut segments: Vec<&str> = match link.kind {
-        LinkKind::BundleAbsolute => Vec::new(),
-        LinkKind::Relative => {
-            let mut dir: Vec<&str> = from.split('/').collect();
-            dir.pop(); // the concept's own name, not part of its directory
-            dir
-        }
+    match link.kind {
+        LinkKind::BundleAbsolute | LinkKind::Relative => {}
         LinkKind::External | LinkKind::Fragment => return None,
-    };
+    }
     let path = link.target.split('#').next().unwrap_or("");
-    let path = path.strip_prefix('/').unwrap_or(path);
     if !path.ends_with(".md") {
         return None;
     }
-    for part in path.split('/') {
-        match part {
-            "" | "." => {}
-            ".." => {
-                segments.pop();
-            }
-            name => segments.push(name),
-        }
-    }
-    Some(strip_md(&segments.join("/")))
+    Some(strip_md(&resolve_path(from, &link.target)))
 }
 
 #[cfg(test)]

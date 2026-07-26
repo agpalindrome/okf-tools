@@ -50,6 +50,9 @@ pub enum Rule {
     /// both of the two §10.3 places (a `computation:` path xor a `# Computation`
     /// body block) — it must be exactly one.
     InvalidComputationSource,
+    /// BUNDLE-3: a path-valued field (§6.2) names a bundle file that is not
+    /// there. A report, not a defect — §6/§11 tolerate a broken reference.
+    DanglingPath,
 }
 
 impl Rule {
@@ -66,6 +69,7 @@ impl Rule {
             Rule::MissingSourceResource => "CONCEPT-6",
             Rule::MissingRuntime => "CONCEPT-7",
             Rule::InvalidComputationSource => "CONCEPT-8",
+            Rule::DanglingPath => "BUNDLE-3",
         }
     }
 
@@ -82,13 +86,14 @@ impl Rule {
             Rule::MissingSourceResource => "missing source resource",
             Rule::MissingRuntime => "missing runtime",
             Rule::InvalidComputationSource => "invalid computation source",
+            Rule::DanglingPath => "dangling path",
         }
     }
 
     /// Whether this rule is a defect or a tolerated report.
     pub fn severity(self) -> Severity {
         match self {
-            Rule::DanglingLink => Severity::Report,
+            Rule::DanglingLink | Rule::DanglingPath => Severity::Report,
             Rule::NotAConcept
             | Rule::MissingType
             | Rule::DuplicateId
@@ -147,7 +152,7 @@ impl fmt::Display for Finding {
 mod tests {
     use super::*;
 
-    const ALL: [Rule; 10] = [
+    const ALL: [Rule; 11] = [
         Rule::NotAConcept,
         Rule::MissingType,
         Rule::DuplicateId,
@@ -158,6 +163,7 @@ mod tests {
         Rule::MissingSourceResource,
         Rule::MissingRuntime,
         Rule::InvalidComputationSource,
+        Rule::DanglingPath,
     ];
 
     #[test]
@@ -172,6 +178,7 @@ mod tests {
     #[test]
     fn severity_splits_the_tolerated_report_from_the_defects() {
         assert_eq!(Rule::DanglingLink.severity(), Severity::Report);
+        assert_eq!(Rule::DanglingPath.severity(), Severity::Report);
         for rule in [
             Rule::NotAConcept,
             Rule::MissingType,
