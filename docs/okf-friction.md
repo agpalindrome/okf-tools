@@ -35,5 +35,9 @@ should admit a general `<scheme>:<id>` form, or §5.1's example should change. T
 `human:` prefix is load-bearing for §5.3 trust tiers, so its special status is
 clear; what is unclear is whether other schemes are legal.
 
+**Raised upstream** 2026-07-26 as
+[GoogleCloudPlatform/knowledge-catalog#234][issue].
+
+[issue]: https://github.com/GoogleCloudPlatform/knowledge-catalog/issues/234
 [s7]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md#7-actor-convention
 [s51]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md#51-provenance-sources
