@@ -38,6 +38,36 @@ clear; what is unclear is whether other schemes are legal.
 **Raised upstream** 2026-07-26 as
 [GoogleCloudPlatform/knowledge-catalog#234][issue].
 
+## 2026-07-26 — inline computation: §10.3 says fenced, §10.2 indents
+
+[§10.3][s103] says an Attested Computation may carry its computation inline as
+*"a single fenced code block in the body under `# Computation`."* But
+[§10.2][s102]'s worked example puts the computation in a **4-space-indented**
+code block, not a fence:
+
+```markdown
+# Computation
+    SELECT SUM(amount) AS revenue
+    FROM finance.recognized_revenue
+    WHERE fiscal_year = @year
+```
+
+So a checker that detects the inline computation by looking for a fenced block
+under `# Computation` would miss the spec's own example, and (for the §10.3
+computation-XOR-fence rule) wrongly conclude the computation is neither inline
+nor a `computation:` path.
+
+**How okf-graph handles it.** It keys the XOR on the **presence of a
+`# Computation` heading** in the body (scanned outside fenced code), not on the
+code block's style — so both a fenced and an indented computation count as
+inline. It does not yet inspect the block's contents (deferred, #58).
+
+**The question for upstream.** Should §10.3 say "a fenced *or indented* code
+block," or should §10.2's example be changed to a fenced block? Not yet raised —
+holding to batch with the actor-convention item (#234) or a later one.
+
 [issue]: https://github.com/GoogleCloudPlatform/knowledge-catalog/issues/234
 [s7]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md#7-actor-convention
 [s51]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md#51-provenance-sources
+[s102]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md#102-contract-fields
+[s103]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md#103-the-computation

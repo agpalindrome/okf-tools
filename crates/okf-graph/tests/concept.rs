@@ -334,6 +334,73 @@ usage_window: { from: 2026-06-01, to: 2026-06-30 }
     assert_eq!(window.to.as_deref(), Some("2026-06-30"));
 }
 
+/// The Attested Computation contract (§10.2) reads back — runtime, the typed
+/// parameters, the executor (resource + receipt), and the attester.
+#[test]
+fn reads_the_attested_computation_contract() {
+    let src = "\
+---
+type: Attested Computation
+runtime: bigquery
+computation: references/computations/revenue.sql
+parameters:
+  - { name: year, type: integer, required: true }
+executor:
+  resource: references/skills/run-on-bq.md
+  receipt: [job_id, executed_sql, result]
+attester:
+  resource: references/attesters/revenue.py
+---
+";
+    let concept = Concept::parse(src).expect("parses");
+    let front = concept.frontmatter();
+
+    assert_eq!(front.runtime(), Some("bigquery"));
+    assert_eq!(
+        front.computation(),
+        Some("references/computations/revenue.sql")
+    );
+
+    let params = front.parameters();
+    assert_eq!(params.len(), 1);
+    assert_eq!(params[0].name.as_deref(), Some("year"));
+    assert_eq!(params[0].kind.as_deref(), Some("integer"));
+    assert_eq!(params[0].required, Some(true));
+
+    let executor = front.executor().expect("executor");
+    assert_eq!(
+        executor.resource.as_deref(),
+        Some("references/skills/run-on-bq.md")
+    );
+    assert_eq!(executor.receipt, ["job_id", "executed_sql", "result"]);
+
+    let attester = front.attester().expect("attester");
+    assert_eq!(
+        attester.resource.as_deref(),
+        Some("references/attesters/revenue.py")
+    );
+}
+
+/// The body's `# Computation` section is detected whether the computation is
+/// fenced or indented (per docs/okf-friction.md), and only outside fenced code.
+#[test]
+fn detects_the_computation_section_fenced_or_indented() {
+    // Indented, as SPEC §10.2's own example writes it.
+    let indented =
+        Concept::parse("---\ntype: Attested Computation\n---\n# Computation\n    SELECT 1\n")
+            .expect("parses");
+    assert!(indented.body().has_computation_section());
+
+    // A `# Computation` line inside a fenced block is not the heading.
+    let fenced_mention =
+        Concept::parse("---\ntype: Reference\n---\n```\n# Computation\n```\n").expect("parses");
+    assert!(!fenced_mention.body().has_computation_section());
+
+    // No such section at all.
+    let none = Concept::parse("---\ntype: Reference\n---\n# Schema\n").expect("parses");
+    assert!(!none.body().has_computation_section());
+}
+
 /// A CRLF file splits like any other: the fences tolerate the carriage return.
 #[test]
 fn crlf_line_endings_split_the_same_way() {

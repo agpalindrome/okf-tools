@@ -159,6 +159,47 @@ fn a_source_without_resource_is_reported() {
     assert_eq!(bundle.findings()[0].file, "thing.md");
 }
 
+/// A well-formed Attested Computation — `runtime` present, exactly one
+/// computation source — reports nothing.
+#[test]
+fn a_valid_attested_computation_reports_nothing() {
+    let bundle = Bundle::load(&fixture("attested-computation")).expect("loads");
+    assert!(
+        bundle.findings().is_empty(),
+        "expected no findings, got: {:?}",
+        bundle.findings()
+    );
+}
+
+/// An Attested Computation with no `runtime` is CONCEPT-7 (§10.2).
+#[test]
+fn an_attested_computation_without_runtime_is_reported() {
+    let bundle = Bundle::load(&fixture("ac-no-runtime")).expect("loads");
+
+    assert_eq!(bundle.findings().len(), 1);
+    assert_eq!(bundle.findings()[0].rule, Rule::MissingRuntime);
+    assert_eq!(bundle.findings()[0].file, "thing.md");
+}
+
+/// A computation given in both a `computation:` path and a `# Computation` body
+/// block is CONCEPT-8 (§10.3).
+#[test]
+fn an_attested_computation_with_both_sources_is_reported() {
+    let bundle = Bundle::load(&fixture("ac-both")).expect("loads");
+
+    assert_eq!(bundle.findings().len(), 1);
+    assert_eq!(bundle.findings()[0].rule, Rule::InvalidComputationSource);
+}
+
+/// A computation given in neither place is also CONCEPT-8 (§10.3).
+#[test]
+fn an_attested_computation_with_neither_source_is_reported() {
+    let bundle = Bundle::load(&fixture("ac-neither")).expect("loads");
+
+    assert_eq!(bundle.findings().len(), 1);
+    assert_eq!(bundle.findings()[0].rule, Rule::InvalidComputationSource);
+}
+
 /// A concept's parent is the nearest path ancestor that is itself a concept;
 /// a directory-only scope (no concept file) contributes none.
 #[test]

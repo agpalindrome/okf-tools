@@ -193,6 +193,48 @@ impl Frontmatter {
         self.fields.get("usage_window").and_then(usage_window)
     }
 
+    /// `runtime` — how an Attested Computation is run (§10.2), which fixes what
+    /// its `parameters` mean. Required for that type, but read like any other
+    /// string: `None` is absent or not a string, and a check reports it.
+    pub fn runtime(&self) -> Option<&str> {
+        self.string("runtime")
+    }
+
+    /// `computation` — a path (§6.2) to a file holding an Attested
+    /// Computation's computation, used instead of the inline body block (§10.3).
+    pub fn computation(&self) -> Option<&str> {
+        self.string("computation")
+    }
+
+    /// `parameters` — the typed, named holes an Attested Computation exposes
+    /// (§10.2), each `{ name, type, required }`. Absent or non-list reads empty;
+    /// non-mapping entries are dropped.
+    pub fn parameters(&self) -> Vec<Parameter> {
+        match self.fields.get("parameters") {
+            Some(Value::Sequence(items)) => items.iter().filter_map(parameter).collect(),
+            _ => Vec::new(),
+        }
+    }
+
+    /// `executor` — how an Attested Computation is run (§10.2): a `resource`
+    /// naming the run instructions, and the `receipt` fields a run must return.
+    pub fn executor(&self) -> Option<Executor> {
+        let value = self.fields.get("executor")?;
+        value.is_mapping().then(|| Executor {
+            resource: str_at(value, "resource"),
+            receipt: string_list(value, "receipt"),
+        })
+    }
+
+    /// `attester` — the deterministic, consumer-side check (§10.2): a `resource`
+    /// naming code that takes a receipt and returns a verdict.
+    pub fn attester(&self) -> Option<Attester> {
+        let value = self.fields.get("attester")?;
+        value.is_mapping().then(|| Attester {
+            resource: str_at(value, "resource"),
+        })
+    }
+
     /// The block exactly as written, fences excluded. §4.1 lets producers add
     /// any keys and *requires* consumers not to reject unknown ones, so
     /// extension keys — and the §5 families — survive here: the payload a
@@ -308,6 +350,60 @@ fn usage_window(value: &Value) -> Option<UsageWindow> {
     })
 }
 
+/// A typed, named hole an Attested Computation exposes (§10.2). `name`/`type`/
+/// `required` are all present in a well-formed entry; each is `Option` so a
+/// malformed one still reads.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Parameter {
+    /// The parameter's name — the hole an agent fills.
+    pub name: Option<String>,
+    /// Its type, interpreted per the concept's `runtime`. Named `kind` because
+    /// `type` is a Rust keyword.
+    pub kind: Option<String>,
+    /// Whether a value must be supplied.
+    pub required: Option<bool>,
+}
+
+/// How an Attested Computation is run (§10.2).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Executor {
+    /// A path (§6.2) to the run instructions or code.
+    pub resource: Option<String>,
+    /// The fields a run must return, the evidence the attester inspects.
+    pub receipt: Vec<String>,
+}
+
+/// The deterministic, consumer-side check of an Attested Computation (§10.2).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Attester {
+    /// A path (§6.2) to the checker code (no LLM).
+    pub resource: Option<String>,
+}
+
+/// Read one `parameters` entry from a value, if it is a mapping.
+fn parameter(value: &Value) -> Option<Parameter> {
+    value.is_mapping().then(|| Parameter {
+        name: str_at(value, "name"),
+        kind: str_at(value, "type"),
+        required: value.get("required").and_then(Value::as_bool),
+    })
+}
+
+/// The list of strings at `value[key]`, or empty when absent or not a list of
+/// strings; a non-string item is dropped.
+fn string_list(value: &Value, key: &str) -> Vec<String> {
+    match value.get(key) {
+        Some(Value::Sequence(items)) => items
+            .iter()
+            .filter_map(|item| match item {
+                Value::String(s) => Some(s.clone()),
+                _ => None,
+            })
+            .collect(),
+        _ => Vec::new(),
+    }
+}
+
 /// The string at `value[key]`, if `value` is a mapping holding a string there.
 fn str_at(value: &Value, key: &str) -> Option<String> {
     match value.get(key) {
@@ -326,6 +422,30 @@ impl Body {
     /// The body text as written.
     pub fn as_str(&self) -> &str {
         &self.0
+    }
+
+    /// Whether the body carries a `# Computation` section (§10.3) — the inline
+    /// half of the Attested-Computation computation-XOR.
+    ///
+    /// Keyed on the heading's presence, at any level and outside fenced code,
+    /// **not** on the code block's style: §10.3 says "fenced", but §10.2's own
+    /// example indents it (`docs/okf-friction.md`), so requiring a fence would
+    /// miss the spec's example. Whether the section actually holds a block is a
+    /// finer check, deferred (#58).
+    pub fn has_computation_section(&self) -> bool {
+        let mut in_fence = false;
+        for line in self.0.lines() {
+            let trimmed = line.trim_start();
+            if trimmed.starts_with("```") || trimmed.starts_with("~~~") {
+                in_fence = !in_fence;
+            } else if !in_fence
+                && trimmed.starts_with('#')
+                && trimmed.trim_start_matches('#').trim() == "Computation"
+            {
+                return true;
+            }
+        }
+        false
     }
 }
 
