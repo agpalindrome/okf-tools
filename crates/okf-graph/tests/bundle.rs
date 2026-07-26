@@ -115,6 +115,19 @@ fn a_dangling_link_is_reported_as_a_report_not_a_defect() {
     );
 }
 
+/// A declared `status` outside the draft/stable/deprecated set is reported as
+/// CONCEPT-3; the concept still loads — a bad status is a defect, not a reason
+/// to drop it.
+#[test]
+fn an_invalid_status_is_reported() {
+    let bundle = Bundle::load(&fixture("bad-status")).expect("loads");
+
+    assert_eq!(bundle.len(), 1);
+    assert_eq!(bundle.findings().len(), 1);
+    assert_eq!(bundle.findings()[0].rule, Rule::InvalidStatus);
+    assert_eq!(bundle.findings()[0].file, "thing.md");
+}
+
 /// A concept's parent is the nearest path ancestor that is itself a concept;
 /// a directory-only scope (no concept file) contributes none.
 #[test]

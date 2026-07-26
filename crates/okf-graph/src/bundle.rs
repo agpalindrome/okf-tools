@@ -181,13 +181,7 @@ fn collect(root: &Path, path: &Path, out: &mut Bundle) -> std::io::Result<()> {
         let text = std::fs::read_to_string(path)?;
         match Concept::parse(&text) {
             Ok(concept) => {
-                if concept_type_missing(&concept) {
-                    out.findings.push(Finding::new(
-                        file.clone(),
-                        Rule::MissingType,
-                        "concept declares no non-empty `type` (SPEC §11)",
-                    ));
-                }
+                out.findings.extend(check_concept(&file, &concept));
                 let id = strip_md(&file);
                 out.add_concept(id, file, concept);
             }
@@ -201,13 +195,32 @@ fn collect(root: &Path, path: &Path, out: &mut Bundle) -> std::io::Result<()> {
     Ok(())
 }
 
-/// A concept with no `type`, or a `type` that is blank (§11 requires it
-/// non-empty). Absent and empty are both defects, and both trip `CONCEPT-2`.
-fn concept_type_missing(concept: &Concept) -> bool {
-    concept
-        .frontmatter()
-        .concept_type()
-        .is_none_or(|t| t.trim().is_empty())
+/// The per-concept (document-level) findings for one concept, located at its
+/// file. Each check is the spec's own MUST/REQUIRED: a bundle that trips one is
+/// non-conformant, not merely unusual.
+fn check_concept(file: &str, concept: &Concept) -> Vec<Finding> {
+    let fm = concept.frontmatter();
+    let mut findings = Vec::new();
+
+    // CONCEPT-2: `type` is required and non-empty (§11).
+    if fm.concept_type().is_none_or(|t| t.trim().is_empty()) {
+        findings.push(Finding::new(
+            file,
+            Rule::MissingType,
+            "concept declares no non-empty `type` (SPEC §11)",
+        ));
+    }
+
+    // CONCEPT-3: a declared `status` must be one of the three values (§5.4).
+    if fm.declares("status") && fm.status().is_none() {
+        findings.push(Finding::new(
+            file,
+            Rule::InvalidStatus,
+            "`status` is not one of draft / stable / deprecated (SPEC §5.4)",
+        ));
+    }
+
+    findings
 }
 
 /// A `*.md` file.

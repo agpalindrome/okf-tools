@@ -130,12 +130,41 @@ impl Frontmatter {
         }
     }
 
+    /// `status` — the lifecycle stage (§5.4), read only when it is one of the
+    /// three declared values. `None` covers both absent and an unrecognised
+    /// value; absent means the spec's default `stable`, but applying that
+    /// default is a consumer's call, not this reader's — okf-graph reports the
+    /// declared shape and derives nothing.
+    pub fn status(&self) -> Option<Status> {
+        match self.string("status")? {
+            "draft" => Some(Status::Draft),
+            "stable" => Some(Status::Stable),
+            "deprecated" => Some(Status::Deprecated),
+            _ => None,
+        }
+    }
+
+    /// `stale_after` — the absolute `YYYY-MM-DD` date on or after which the
+    /// concept is stale (§5.5), kept as written. Whether it parses as a date,
+    /// and whether today is past it, are questions for a consumer, not this
+    /// reader.
+    pub fn stale_after(&self) -> Option<&str> {
+        self.string("stale_after")
+    }
+
     /// The block exactly as written, fences excluded. §4.1 lets producers add
     /// any keys and *requires* consumers not to reject unknown ones, so
     /// extension keys — and the §5 families — survive here: the payload a
     /// semantic layer reads and this crate does not interpret.
     pub fn source(&self) -> &str {
         &self.source
+    }
+
+    /// Whether the block declares `key` at all, of any shape. Lets a check tell
+    /// "absent" (fine) from "present but the wrong shape" (a finding) — the
+    /// distinction the `Some`-only-on-shape readers deliberately drop.
+    pub(crate) fn declares(&self, key: &str) -> bool {
+        self.fields.contains_key(key)
     }
 
     /// The string at `key`, if the block holds a string there.
@@ -145,6 +174,18 @@ impl Frontmatter {
             _ => None,
         }
     }
+}
+
+/// A concept's lifecycle `status` (§5.4). Absent defaults to `Stable`, but that
+/// default is a consumer's to apply — see [`Frontmatter::status`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Status {
+    /// Not yet reviewed; possibly incomplete.
+    Draft,
+    /// Ready for consumption (the default when `status` is absent).
+    Stable,
+    /// Kept for links and history; no longer current.
+    Deprecated,
 }
 
 /// Everything after the frontmatter (§4.2): markdown, carried verbatim and not

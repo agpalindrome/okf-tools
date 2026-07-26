@@ -5,7 +5,7 @@
 //! that *look* readable — a bare-string frontmatter block, a tag list with a
 //! non-string in it, a `---` in the prose that is a horizontal rule.
 
-use okf_graph::{Concept, ConceptError};
+use okf_graph::{Concept, ConceptError, Status};
 
 /// SPEC §4.3, abridged: a concept bound to a resource, stating every field
 /// §4.1 names — plus a §5 trust family this crate carries without reading.
@@ -225,6 +225,34 @@ fn a_field_of_the_wrong_shape_reads_as_absent() {
 
     assert_eq!(concept.frontmatter().concept_type(), None);
     assert_eq!(concept.frontmatter().title(), Some("Answers"));
+}
+
+/// The lifecycle families (§5.4/§5.5) read back: `status` as an enum, and
+/// `stale_after` as the raw date string.
+#[test]
+fn reads_lifecycle_status_and_stale_after() {
+    let concept =
+        Concept::parse("---\ntype: Reference\nstatus: deprecated\nstale_after: 2026-09-23\n---\n")
+            .expect("parses");
+
+    assert_eq!(concept.frontmatter().status(), Some(Status::Deprecated));
+    assert_eq!(concept.frontmatter().stale_after(), Some("2026-09-23"));
+}
+
+/// An unrecognised `status` reads as `None`, by the same shape rule as `tags`;
+/// telling that from absent (both `None`) is a conformance check's job.
+#[test]
+fn an_unrecognised_status_reads_as_none() {
+    let concept = Concept::parse("---\ntype: Reference\nstatus: archived\n---\n").expect("parses");
+    assert_eq!(concept.frontmatter().status(), None);
+}
+
+/// An absent lifecycle family is `None` — not an error, and not defaulted here.
+#[test]
+fn absent_lifecycle_fields_are_none() {
+    let concept = Concept::parse("---\ntype: Reference\n---\n").expect("parses");
+    assert_eq!(concept.frontmatter().status(), None);
+    assert_eq!(concept.frontmatter().stale_after(), None);
 }
 
 /// A CRLF file splits like any other: the fences tolerate the carriage return.

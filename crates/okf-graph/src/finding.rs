@@ -33,6 +33,9 @@ pub enum Rule {
     /// report, not a defect — the spec says a broken link may just be
     /// not-yet-written knowledge.
     DanglingLink,
+    /// CONCEPT-3: `status` is present but not `draft` / `stable` / `deprecated`
+    /// (§5.4).
+    InvalidStatus,
 }
 
 impl Rule {
@@ -43,6 +46,7 @@ impl Rule {
             Rule::MissingType => "CONCEPT-2",
             Rule::DuplicateId => "BUNDLE-1",
             Rule::DanglingLink => "BUNDLE-2",
+            Rule::InvalidStatus => "CONCEPT-3",
         }
     }
 
@@ -53,6 +57,7 @@ impl Rule {
             Rule::MissingType => "missing type",
             Rule::DuplicateId => "duplicate concept id",
             Rule::DanglingLink => "dangling link",
+            Rule::InvalidStatus => "invalid status",
         }
     }
 
@@ -60,7 +65,9 @@ impl Rule {
     pub fn severity(self) -> Severity {
         match self {
             Rule::DanglingLink => Severity::Report,
-            Rule::NotAConcept | Rule::MissingType | Rule::DuplicateId => Severity::Defect,
+            Rule::NotAConcept | Rule::MissingType | Rule::DuplicateId | Rule::InvalidStatus => {
+                Severity::Defect
+            }
         }
     }
 }
@@ -110,11 +117,12 @@ impl fmt::Display for Finding {
 mod tests {
     use super::*;
 
-    const ALL: [Rule; 4] = [
+    const ALL: [Rule; 5] = [
         Rule::NotAConcept,
         Rule::MissingType,
         Rule::DuplicateId,
         Rule::DanglingLink,
+        Rule::InvalidStatus,
     ];
 
     #[test]
@@ -129,7 +137,12 @@ mod tests {
     #[test]
     fn severity_splits_the_tolerated_report_from_the_defects() {
         assert_eq!(Rule::DanglingLink.severity(), Severity::Report);
-        for rule in [Rule::NotAConcept, Rule::MissingType, Rule::DuplicateId] {
+        for rule in [
+            Rule::NotAConcept,
+            Rule::MissingType,
+            Rule::DuplicateId,
+            Rule::InvalidStatus,
+        ] {
             assert_eq!(rule.severity(), Severity::Defect, "{rule:?}");
         }
     }
