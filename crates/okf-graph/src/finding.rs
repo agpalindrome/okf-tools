@@ -33,6 +33,16 @@ pub enum Rule {
     /// report, not a defect — the spec says a broken link may just be
     /// not-yet-written knowledge.
     DanglingLink,
+    /// CONCEPT-3: `status` is present but not `draft` / `stable` / `deprecated`
+    /// (§5.4).
+    InvalidStatus,
+    /// CONCEPT-4: a declared `generated` block carries no `by` (§5.2 REQUIRED).
+    MissingGeneratedBy,
+    /// CONCEPT-5: an actor field (`generated.by`, `verified[].by`, or a source
+    /// `author`) does not match the §7 convention.
+    MalformedActor,
+    /// CONCEPT-6: a `sources` entry declares no `resource` (§5.1 REQUIRED).
+    MissingSourceResource,
 }
 
 impl Rule {
@@ -43,6 +53,10 @@ impl Rule {
             Rule::MissingType => "CONCEPT-2",
             Rule::DuplicateId => "BUNDLE-1",
             Rule::DanglingLink => "BUNDLE-2",
+            Rule::InvalidStatus => "CONCEPT-3",
+            Rule::MissingGeneratedBy => "CONCEPT-4",
+            Rule::MalformedActor => "CONCEPT-5",
+            Rule::MissingSourceResource => "CONCEPT-6",
         }
     }
 
@@ -53,6 +67,10 @@ impl Rule {
             Rule::MissingType => "missing type",
             Rule::DuplicateId => "duplicate concept id",
             Rule::DanglingLink => "dangling link",
+            Rule::InvalidStatus => "invalid status",
+            Rule::MissingGeneratedBy => "missing generated.by",
+            Rule::MalformedActor => "malformed actor",
+            Rule::MissingSourceResource => "missing source resource",
         }
     }
 
@@ -60,7 +78,13 @@ impl Rule {
     pub fn severity(self) -> Severity {
         match self {
             Rule::DanglingLink => Severity::Report,
-            Rule::NotAConcept | Rule::MissingType | Rule::DuplicateId => Severity::Defect,
+            Rule::NotAConcept
+            | Rule::MissingType
+            | Rule::DuplicateId
+            | Rule::InvalidStatus
+            | Rule::MissingGeneratedBy
+            | Rule::MalformedActor
+            | Rule::MissingSourceResource => Severity::Defect,
         }
     }
 }
@@ -110,11 +134,15 @@ impl fmt::Display for Finding {
 mod tests {
     use super::*;
 
-    const ALL: [Rule; 4] = [
+    const ALL: [Rule; 8] = [
         Rule::NotAConcept,
         Rule::MissingType,
         Rule::DuplicateId,
         Rule::DanglingLink,
+        Rule::InvalidStatus,
+        Rule::MissingGeneratedBy,
+        Rule::MalformedActor,
+        Rule::MissingSourceResource,
     ];
 
     #[test]
@@ -129,7 +157,15 @@ mod tests {
     #[test]
     fn severity_splits_the_tolerated_report_from_the_defects() {
         assert_eq!(Rule::DanglingLink.severity(), Severity::Report);
-        for rule in [Rule::NotAConcept, Rule::MissingType, Rule::DuplicateId] {
+        for rule in [
+            Rule::NotAConcept,
+            Rule::MissingType,
+            Rule::DuplicateId,
+            Rule::InvalidStatus,
+            Rule::MissingGeneratedBy,
+            Rule::MalformedActor,
+            Rule::MissingSourceResource,
+        ] {
             assert_eq!(rule.severity(), Severity::Defect, "{rule:?}");
         }
     }

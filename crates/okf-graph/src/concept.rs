@@ -130,6 +130,69 @@ impl Frontmatter {
         }
     }
 
+    /// `status` — the lifecycle stage (§5.4), read only when it is one of the
+    /// three declared values. `None` covers both absent and an unrecognised
+    /// value; absent means the spec's default `stable`, but applying that
+    /// default is a consumer's call, not this reader's — okf-graph reports the
+    /// declared shape and derives nothing.
+    pub fn status(&self) -> Option<Status> {
+        match self.string("status")? {
+            "draft" => Some(Status::Draft),
+            "stable" => Some(Status::Stable),
+            "deprecated" => Some(Status::Deprecated),
+            _ => None,
+        }
+    }
+
+    /// `stale_after` — the absolute `YYYY-MM-DD` date on or after which the
+    /// concept is stale (§5.5), kept as written. Whether it parses as a date,
+    /// and whether today is past it, are questions for a consumer, not this
+    /// reader.
+    pub fn stale_after(&self) -> Option<&str> {
+        self.string("stale_after")
+    }
+
+    /// `generated` — how the current content was produced (§5.2): an actor
+    /// `by` (required) and an ISO-8601 `at`. `None` when `generated` is absent
+    /// or is not a mapping; a mapping with no `by` still reads (as
+    /// `Generated { by: None, .. }`), so a check can tell it from absent.
+    pub fn generated(&self) -> Option<Generated> {
+        let value = self.fields.get("generated")?;
+        value.is_mapping().then(|| Generated {
+            by: str_at(value, "by"),
+            at: str_at(value, "at"),
+        })
+    }
+
+    /// `verified` — the verification events (§5.2), each an actor `by` and an
+    /// ISO-8601 `at`. A **bare `{ by, at }` mapping counts as one** event, not
+    /// zero (§5.2 MUST); a list reads each entry; absent reads as empty.
+    pub fn verified(&self) -> Vec<Verification> {
+        match self.fields.get("verified") {
+            Some(Value::Sequence(items)) => items.iter().filter_map(verification).collect(),
+            Some(value @ Value::Mapping(_)) => verification(value).into_iter().collect(),
+            _ => Vec::new(),
+        }
+    }
+
+    /// `sources` — the materials a concept derives from (§5.1). Each entry's
+    /// `resource` is required, but a missing one still reads (as
+    /// `Source { resource: None, .. }`) so a check can locate it; non-mapping
+    /// entries are dropped, and an absent or non-list `sources` reads as empty.
+    pub fn sources(&self) -> Vec<Source> {
+        match self.fields.get("sources") {
+            Some(Value::Sequence(items)) => items.iter().filter_map(source_entry).collect(),
+            _ => Vec::new(),
+        }
+    }
+
+    /// `usage_window` — the shared `{ from, to }` range that frames every
+    /// source's `usage_count` (§5.1). A single source may carry its own; this
+    /// reads the bundle-wide sibling.
+    pub fn usage_window(&self) -> Option<UsageWindow> {
+        self.fields.get("usage_window").and_then(usage_window)
+    }
+
     /// The block exactly as written, fences excluded. §4.1 lets producers add
     /// any keys and *requires* consumers not to reject unknown ones, so
     /// extension keys — and the §5 families — survive here: the payload a
@@ -138,12 +201,118 @@ impl Frontmatter {
         &self.source
     }
 
+    /// Whether the block declares `key` at all, of any shape. Lets a check tell
+    /// "absent" (fine) from "present but the wrong shape" (a finding) — the
+    /// distinction the `Some`-only-on-shape readers deliberately drop.
+    pub(crate) fn declares(&self, key: &str) -> bool {
+        self.fields.contains_key(key)
+    }
+
     /// The string at `key`, if the block holds a string there.
     fn string(&self, key: &str) -> Option<&str> {
         match self.fields.get(key) {
             Some(Value::String(s)) => Some(s.as_str()),
             _ => None,
         }
+    }
+}
+
+/// A concept's lifecycle `status` (§5.4). Absent defaults to `Stable`, but that
+/// default is a consumer's to apply — see [`Frontmatter::status`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Status {
+    /// Not yet reviewed; possibly incomplete.
+    Draft,
+    /// Ready for consumption (the default when `status` is absent).
+    Stable,
+    /// Kept for links and history; no longer current.
+    Deprecated,
+}
+
+/// The `generated` trust family (§5.2): who produced the current content and
+/// when. Both are read as written; `by` should be an actor (§7) and `at` an
+/// ISO-8601 datetime, but whether they are is a check's or a consumer's call.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Generated {
+    /// The actor that produced the content (§7). Required by §5.2.
+    pub by: Option<String>,
+    /// The ISO-8601 datetime of the last meaningful change.
+    pub at: Option<String>,
+}
+
+/// One `verified` event (§5.2): who confirmed the content, and when.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Verification {
+    /// The actor that confirmed the content (§7).
+    pub by: Option<String>,
+    /// The ISO-8601 datetime of the confirmation.
+    pub at: Option<String>,
+}
+
+/// One `sources` entry (§5.1): a material a concept derives from, and the
+/// per-source credibility signals. `resource` is required by the spec, but is
+/// `Option` here so a missing one can be read and then reported.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Source {
+    /// A stable key used to attribute individual claims.
+    pub id: Option<String>,
+    /// The artifact or scope the concept derives from (required by §5.1).
+    pub resource: Option<String>,
+    /// A human-readable label.
+    pub title: Option<String>,
+    /// Who or what produced the source, in the actor convention (§7).
+    pub author: Option<String>,
+    /// How often `resource` was exercised over the `usage_window`.
+    pub usage_count: Option<i64>,
+    /// When the source itself last changed (`YYYY-MM-DD`).
+    pub last_modified: Option<String>,
+    /// A per-source `{ from, to }` range overriding the shared one.
+    pub usage_window: Option<UsageWindow>,
+}
+
+/// The `{ from, to }` date range that frames a `usage_count` (§5.1).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UsageWindow {
+    /// Start of the window (`YYYY-MM-DD`).
+    pub from: Option<String>,
+    /// End of the window (`YYYY-MM-DD`).
+    pub to: Option<String>,
+}
+
+/// Read one `{ by, at }` event from a value, if it is a mapping.
+fn verification(value: &Value) -> Option<Verification> {
+    value.is_mapping().then(|| Verification {
+        by: str_at(value, "by"),
+        at: str_at(value, "at"),
+    })
+}
+
+/// Read one `sources` entry from a value, if it is a mapping.
+fn source_entry(value: &Value) -> Option<Source> {
+    value.is_mapping().then(|| Source {
+        id: str_at(value, "id"),
+        resource: str_at(value, "resource"),
+        title: str_at(value, "title"),
+        author: str_at(value, "author"),
+        usage_count: value.get("usage_count").and_then(Value::as_i64),
+        last_modified: str_at(value, "last_modified"),
+        usage_window: value.get("usage_window").and_then(usage_window),
+    })
+}
+
+/// Read a `{ from, to }` window from a value, if it is a mapping.
+fn usage_window(value: &Value) -> Option<UsageWindow> {
+    value.is_mapping().then(|| UsageWindow {
+        from: str_at(value, "from"),
+        to: str_at(value, "to"),
+    })
+}
+
+/// The string at `value[key]`, if `value` is a mapping holding a string there.
+fn str_at(value: &Value, key: &str) -> Option<String> {
+    match value.get(key) {
+        Some(Value::String(s)) => Some(s.clone()),
+        _ => None,
     }
 }
 

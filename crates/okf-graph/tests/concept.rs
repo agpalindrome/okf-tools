@@ -5,7 +5,20 @@
 //! that *look* readable — a bare-string frontmatter block, a tag list with a
 //! non-string in it, a `---` in the prose that is a horizontal rule.
 
-use okf_graph::{Concept, ConceptError};
+use okf_graph::{Concept, ConceptError, Status};
+
+/// A concept whose frontmatter carries the §5 trust family, for the readers.
+const TRUST_CONCEPT: &str = "\
+---
+type: Reference
+generated: { by: reference_agent/gemini-2.5-pro, at: 2026-06-20T22:53:05Z }
+verified:
+  - { by: human:ahormati, at: 2026-06-25T09:00:00Z }
+  - { by: process:finance-nightly, at: 2026-06-26T02:00:00Z }
+---
+
+# Body
+";
 
 /// SPEC §4.3, abridged: a concept bound to a resource, stating every field
 /// §4.1 names — plus a §5 trust family this crate carries without reading.
@@ -225,6 +238,100 @@ fn a_field_of_the_wrong_shape_reads_as_absent() {
 
     assert_eq!(concept.frontmatter().concept_type(), None);
     assert_eq!(concept.frontmatter().title(), Some("Answers"));
+}
+
+/// The lifecycle families (§5.4/§5.5) read back: `status` as an enum, and
+/// `stale_after` as the raw date string.
+#[test]
+fn reads_lifecycle_status_and_stale_after() {
+    let concept =
+        Concept::parse("---\ntype: Reference\nstatus: deprecated\nstale_after: 2026-09-23\n---\n")
+            .expect("parses");
+
+    assert_eq!(concept.frontmatter().status(), Some(Status::Deprecated));
+    assert_eq!(concept.frontmatter().stale_after(), Some("2026-09-23"));
+}
+
+/// An unrecognised `status` reads as `None`, by the same shape rule as `tags`;
+/// telling that from absent (both `None`) is a conformance check's job.
+#[test]
+fn an_unrecognised_status_reads_as_none() {
+    let concept = Concept::parse("---\ntype: Reference\nstatus: archived\n---\n").expect("parses");
+    assert_eq!(concept.frontmatter().status(), None);
+}
+
+/// An absent lifecycle family is `None` — not an error, and not defaulted here.
+#[test]
+fn absent_lifecycle_fields_are_none() {
+    let concept = Concept::parse("---\ntype: Reference\n---\n").expect("parses");
+    assert_eq!(concept.frontmatter().status(), None);
+    assert_eq!(concept.frontmatter().stale_after(), None);
+}
+
+/// `generated` and a `verified` list read back — the actor `by` and the `at`.
+#[test]
+fn reads_generated_and_a_verified_list() {
+    let front = Concept::parse(TRUST_CONCEPT).expect("parses");
+    let front = front.frontmatter();
+
+    let generated = front.generated().expect("generated is present");
+    assert_eq!(
+        generated.by.as_deref(),
+        Some("reference_agent/gemini-2.5-pro")
+    );
+    assert_eq!(generated.at.as_deref(), Some("2026-06-20T22:53:05Z"));
+
+    let verified = front.verified();
+    assert_eq!(verified.len(), 2);
+    assert_eq!(verified[0].by.as_deref(), Some("human:ahormati"));
+    assert_eq!(verified[1].by.as_deref(), Some("process:finance-nightly"));
+}
+
+/// The §5.2 MUST: a bare `verified: { by, at }` mapping is one event, not zero.
+#[test]
+fn a_bare_verified_mapping_counts_as_one() {
+    let concept =
+        Concept::parse("---\ntype: Reference\nverified: { by: human:x, at: 2026-06-25 }\n---\n")
+            .expect("parses");
+
+    let verified = concept.frontmatter().verified();
+    assert_eq!(verified.len(), 1);
+    assert_eq!(verified[0].by.as_deref(), Some("human:x"));
+}
+
+/// `sources` and the shared `usage_window` read back — the credibility signals
+/// and the date range (§5.1).
+#[test]
+fn reads_sources_and_the_shared_usage_window() {
+    let src = "\
+---
+type: Reference
+sources:
+  - id: ga4
+    resource: https://example.com/schema
+    author: team:ga4-docs
+    usage_count: 5000
+    last_modified: 2026-05-30
+usage_window: { from: 2026-06-01, to: 2026-06-30 }
+---
+";
+    let concept = Concept::parse(src).expect("parses");
+    let front = concept.frontmatter();
+
+    let sources = front.sources();
+    assert_eq!(sources.len(), 1);
+    assert_eq!(sources[0].id.as_deref(), Some("ga4"));
+    assert_eq!(
+        sources[0].resource.as_deref(),
+        Some("https://example.com/schema")
+    );
+    assert_eq!(sources[0].author.as_deref(), Some("team:ga4-docs"));
+    assert_eq!(sources[0].usage_count, Some(5000));
+    assert_eq!(sources[0].last_modified.as_deref(), Some("2026-05-30"));
+
+    let window = front.usage_window().expect("shared usage_window");
+    assert_eq!(window.from.as_deref(), Some("2026-06-01"));
+    assert_eq!(window.to.as_deref(), Some("2026-06-30"));
 }
 
 /// A CRLF file splits like any other: the fences tolerate the carriage return.

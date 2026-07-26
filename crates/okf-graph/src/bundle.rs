@@ -181,13 +181,7 @@ fn collect(root: &Path, path: &Path, out: &mut Bundle) -> std::io::Result<()> {
         let text = std::fs::read_to_string(path)?;
         match Concept::parse(&text) {
             Ok(concept) => {
-                if concept_type_missing(&concept) {
-                    out.findings.push(Finding::new(
-                        file.clone(),
-                        Rule::MissingType,
-                        "concept declares no non-empty `type` (SPEC §11)",
-                    ));
-                }
+                out.findings.extend(check_concept(&file, &concept));
                 let id = strip_md(&file);
                 out.add_concept(id, file, concept);
             }
@@ -201,13 +195,108 @@ fn collect(root: &Path, path: &Path, out: &mut Bundle) -> std::io::Result<()> {
     Ok(())
 }
 
-/// A concept with no `type`, or a `type` that is blank (§11 requires it
-/// non-empty). Absent and empty are both defects, and both trip `CONCEPT-2`.
-fn concept_type_missing(concept: &Concept) -> bool {
-    concept
-        .frontmatter()
-        .concept_type()
-        .is_none_or(|t| t.trim().is_empty())
+/// The per-concept (document-level) findings for one concept, located at its
+/// file. Each check is the spec's own MUST/REQUIRED: a bundle that trips one is
+/// non-conformant, not merely unusual.
+fn check_concept(file: &str, concept: &Concept) -> Vec<Finding> {
+    let fm = concept.frontmatter();
+    let mut findings = Vec::new();
+
+    // CONCEPT-2: `type` is required and non-empty (§11).
+    if fm.concept_type().is_none_or(|t| t.trim().is_empty()) {
+        findings.push(Finding::new(
+            file,
+            Rule::MissingType,
+            "concept declares no non-empty `type` (SPEC §11)",
+        ));
+    }
+
+    // CONCEPT-3: a declared `status` must be one of the three values (§5.4).
+    if fm.declares("status") && fm.status().is_none() {
+        findings.push(Finding::new(
+            file,
+            Rule::InvalidStatus,
+            "`status` is not one of draft / stable / deprecated (SPEC §5.4)",
+        ));
+    }
+
+    // CONCEPT-4 / CONCEPT-5: a declared `generated` needs a `by` (§5.2), and it
+    // must be a well-formed actor (§7).
+    if fm.declares("generated") {
+        match fm.generated().and_then(|g| g.by) {
+            None => findings.push(Finding::new(
+                file,
+                Rule::MissingGeneratedBy,
+                "`generated` declares no `by` (SPEC §5.2)",
+            )),
+            Some(by) if by.trim().is_empty() => findings.push(Finding::new(
+                file,
+                Rule::MissingGeneratedBy,
+                "`generated.by` is empty (SPEC §5.2)",
+            )),
+            Some(by) => findings.extend(actor_finding(file, "generated.by", &by)),
+        }
+    }
+
+    // CONCEPT-5: every `verified[].by` must be a well-formed actor (§7).
+    for (i, event) in fm.verified().iter().enumerate() {
+        if let Some(by) = event.by.as_deref() {
+            findings.extend(actor_finding(file, &format!("verified[{i}].by"), by));
+        }
+    }
+
+    // CONCEPT-6 / CONCEPT-5: each source needs a `resource` (§5.1 REQUIRED), and
+    // an `author`, if present, must be a well-formed actor (§7).
+    for (i, source) in fm.sources().iter().enumerate() {
+        if source
+            .resource
+            .as_deref()
+            .is_none_or(|r| r.trim().is_empty())
+        {
+            findings.push(Finding::new(
+                file,
+                Rule::MissingSourceResource,
+                format!("`sources[{i}]` declares no `resource` (SPEC §5.1)"),
+            ));
+        }
+        if let Some(author) = source.author.as_deref() {
+            findings.extend(actor_finding(file, &format!("sources[{i}].author"), author));
+        }
+    }
+
+    findings
+}
+
+/// A `CONCEPT-5` finding when `value` is present but not a well-formed actor.
+///
+/// An actor is read permissively — `producer/version` or `scheme:id` — because
+/// §7's three-form list excludes its own §5.1 `team:` example. See
+/// `docs/okf-friction.md`.
+fn actor_finding(file: &str, field: &str, value: &str) -> Option<Finding> {
+    if is_actor(value) {
+        return None;
+    }
+    Some(Finding::new(
+        file,
+        Rule::MalformedActor,
+        format!("`{field}` = `{value}` is not a `producer/version` or `scheme:id` actor (SPEC §7)"),
+    ))
+}
+
+/// A well-formed actor (§7), read permissively (see [`actor_finding`]): a
+/// `producer/version` pair, or a `scheme:id` with a non-empty scheme and id.
+fn is_actor(value: &str) -> bool {
+    if let Some((producer, version)) = value.split_once('/') {
+        return !producer.is_empty() && !version.is_empty();
+    }
+    if let Some((scheme, id)) = value.split_once(':') {
+        return !scheme.is_empty()
+            && !id.is_empty()
+            && scheme
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-');
+    }
+    false
 }
 
 /// A `*.md` file.
