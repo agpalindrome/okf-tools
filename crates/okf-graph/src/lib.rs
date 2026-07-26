@@ -32,7 +32,8 @@ mod links;
 
 pub use bundle::Bundle;
 pub use concept::{
-    Body, Concept, ConceptError, Frontmatter, Generated, Source, Status, UsageWindow, Verification,
+    Attester, Body, Concept, ConceptError, Executor, Frontmatter, Generated, Parameter, Source,
+    Status, UsageWindow, Verification,
 };
 pub use finding::{Finding, Rule, Severity};
 pub use links::{links_in, Link, LinkKind};
