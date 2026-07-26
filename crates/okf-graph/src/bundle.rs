@@ -63,6 +63,34 @@ impl Bundle {
         &self.links
     }
 
+    /// The parent of a concept in the directory hierarchy (§3): the nearest
+    /// path ancestor that is itself a concept. `datasets/sales/detail` →
+    /// `datasets/sales` if that is a concept, else `datasets`, else `None` — a
+    /// directory with only an `index.md` is a scope, not a concept, so it links
+    /// nothing.
+    pub fn parent<'a>(&'a self, id: &str) -> Option<&'a str> {
+        let mut rest = id;
+        while let Some(slash) = rest.rfind('/') {
+            let ancestor = &rest[..slash];
+            if let Some((key, _)) = self.concepts.get_key_value(ancestor) {
+                return Some(key.as_str());
+            }
+            rest = ancestor;
+        }
+        None
+    }
+
+    /// The concepts whose parent is `id`, in Concept ID order — the inverse of
+    /// [`parent`](Self::parent), so a grandchild attaches to its nearest concept
+    /// ancestor, not to every ancestor.
+    pub fn children<'a>(&'a self, id: &str) -> Vec<&'a str> {
+        self.concepts
+            .keys()
+            .filter(|child| self.parent(child) == Some(id))
+            .map(String::as_str)
+            .collect()
+    }
+
     /// Every finding the load produced.
     pub fn findings(&self) -> &[Finding] {
         &self.findings

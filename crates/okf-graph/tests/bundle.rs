@@ -114,3 +114,32 @@ fn a_dangling_link_is_reported_as_a_report_not_a_defect() {
         "a dangling link must not be a defect"
     );
 }
+
+/// A concept's parent is the nearest path ancestor that is itself a concept;
+/// a directory-only scope (no concept file) contributes none.
+#[test]
+fn parent_is_the_nearest_concept_ancestor() {
+    let bundle = Bundle::load(&fixture("hierarchy")).expect("loads");
+
+    assert_eq!(bundle.parent("datasets"), None);
+    assert_eq!(bundle.parent("datasets/sales"), Some("datasets"));
+    assert_eq!(
+        bundle.parent("datasets/sales/detail"),
+        Some("datasets/sales")
+    );
+    assert_eq!(bundle.parent("orphan/deep"), None);
+}
+
+/// Children invert the parent relation, so a grandchild attaches to its nearest
+/// concept ancestor rather than to every ancestor above it.
+#[test]
+fn children_attach_to_their_nearest_concept_ancestor() {
+    let bundle = Bundle::load(&fixture("hierarchy")).expect("loads");
+
+    assert_eq!(bundle.children("datasets"), vec!["datasets/sales"]);
+    assert_eq!(
+        bundle.children("datasets/sales"),
+        vec!["datasets/sales/detail"]
+    );
+    assert!(bundle.children("orphan/deep").is_empty());
+}
