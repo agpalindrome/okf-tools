@@ -152,6 +152,29 @@ impl Frontmatter {
         self.string("stale_after")
     }
 
+    /// `generated` — how the current content was produced (§5.2): an actor
+    /// `by` (required) and an ISO-8601 `at`. `None` when `generated` is absent
+    /// or is not a mapping; a mapping with no `by` still reads (as
+    /// `Generated { by: None, .. }`), so a check can tell it from absent.
+    pub fn generated(&self) -> Option<Generated> {
+        let value = self.fields.get("generated")?;
+        value.is_mapping().then(|| Generated {
+            by: str_at(value, "by"),
+            at: str_at(value, "at"),
+        })
+    }
+
+    /// `verified` — the verification events (§5.2), each an actor `by` and an
+    /// ISO-8601 `at`. A **bare `{ by, at }` mapping counts as one** event, not
+    /// zero (§5.2 MUST); a list reads each entry; absent reads as empty.
+    pub fn verified(&self) -> Vec<Verification> {
+        match self.fields.get("verified") {
+            Some(Value::Sequence(items)) => items.iter().filter_map(verification).collect(),
+            Some(value @ Value::Mapping(_)) => verification(value).into_iter().collect(),
+            _ => Vec::new(),
+        }
+    }
+
     /// The block exactly as written, fences excluded. §4.1 lets producers add
     /// any keys and *requires* consumers not to reject unknown ones, so
     /// extension keys — and the §5 families — survive here: the payload a
@@ -186,6 +209,42 @@ pub enum Status {
     Stable,
     /// Kept for links and history; no longer current.
     Deprecated,
+}
+
+/// The `generated` trust family (§5.2): who produced the current content and
+/// when. Both are read as written; `by` should be an actor (§7) and `at` an
+/// ISO-8601 datetime, but whether they are is a check's or a consumer's call.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Generated {
+    /// The actor that produced the content (§7). Required by §5.2.
+    pub by: Option<String>,
+    /// The ISO-8601 datetime of the last meaningful change.
+    pub at: Option<String>,
+}
+
+/// One `verified` event (§5.2): who confirmed the content, and when.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Verification {
+    /// The actor that confirmed the content (§7).
+    pub by: Option<String>,
+    /// The ISO-8601 datetime of the confirmation.
+    pub at: Option<String>,
+}
+
+/// Read one `{ by, at }` event from a value, if it is a mapping.
+fn verification(value: &Value) -> Option<Verification> {
+    value.is_mapping().then(|| Verification {
+        by: str_at(value, "by"),
+        at: str_at(value, "at"),
+    })
+}
+
+/// The string at `value[key]`, if `value` is a mapping holding a string there.
+fn str_at(value: &Value, key: &str) -> Option<String> {
+    match value.get(key) {
+        Some(Value::String(s)) => Some(s.clone()),
+        _ => None,
+    }
 }
 
 /// Everything after the frontmatter (§4.2): markdown, carried verbatim and not

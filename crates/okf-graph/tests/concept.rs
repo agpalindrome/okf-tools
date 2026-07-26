@@ -7,6 +7,19 @@
 
 use okf_graph::{Concept, ConceptError, Status};
 
+/// A concept whose frontmatter carries the §5 trust family, for the readers.
+const TRUST_CONCEPT: &str = "\
+---
+type: Reference
+generated: { by: reference_agent/gemini-2.5-pro, at: 2026-06-20T22:53:05Z }
+verified:
+  - { by: human:ahormati, at: 2026-06-25T09:00:00Z }
+  - { by: process:finance-nightly, at: 2026-06-26T02:00:00Z }
+---
+
+# Body
+";
+
 /// SPEC §4.3, abridged: a concept bound to a resource, stating every field
 /// §4.1 names — plus a §5 trust family this crate carries without reading.
 const RESOURCE_CONCEPT: &str = "\
@@ -253,6 +266,37 @@ fn absent_lifecycle_fields_are_none() {
     let concept = Concept::parse("---\ntype: Reference\n---\n").expect("parses");
     assert_eq!(concept.frontmatter().status(), None);
     assert_eq!(concept.frontmatter().stale_after(), None);
+}
+
+/// `generated` and a `verified` list read back — the actor `by` and the `at`.
+#[test]
+fn reads_generated_and_a_verified_list() {
+    let front = Concept::parse(TRUST_CONCEPT).expect("parses");
+    let front = front.frontmatter();
+
+    let generated = front.generated().expect("generated is present");
+    assert_eq!(
+        generated.by.as_deref(),
+        Some("reference_agent/gemini-2.5-pro")
+    );
+    assert_eq!(generated.at.as_deref(), Some("2026-06-20T22:53:05Z"));
+
+    let verified = front.verified();
+    assert_eq!(verified.len(), 2);
+    assert_eq!(verified[0].by.as_deref(), Some("human:ahormati"));
+    assert_eq!(verified[1].by.as_deref(), Some("process:finance-nightly"));
+}
+
+/// The §5.2 MUST: a bare `verified: { by, at }` mapping is one event, not zero.
+#[test]
+fn a_bare_verified_mapping_counts_as_one() {
+    let concept =
+        Concept::parse("---\ntype: Reference\nverified: { by: human:x, at: 2026-06-25 }\n---\n")
+            .expect("parses");
+
+    let verified = concept.frontmatter().verified();
+    assert_eq!(verified.len(), 1);
+    assert_eq!(verified[0].by.as_deref(), Some("human:x"));
 }
 
 /// A CRLF file splits like any other: the fences tolerate the carriage return.

@@ -36,6 +36,11 @@ pub enum Rule {
     /// CONCEPT-3: `status` is present but not `draft` / `stable` / `deprecated`
     /// (§5.4).
     InvalidStatus,
+    /// CONCEPT-4: a declared `generated` block carries no `by` (§5.2 REQUIRED).
+    MissingGeneratedBy,
+    /// CONCEPT-5: an actor field (`generated.by`, `verified[].by`, or a source
+    /// `author`) does not match the §7 convention.
+    MalformedActor,
 }
 
 impl Rule {
@@ -47,6 +52,8 @@ impl Rule {
             Rule::DuplicateId => "BUNDLE-1",
             Rule::DanglingLink => "BUNDLE-2",
             Rule::InvalidStatus => "CONCEPT-3",
+            Rule::MissingGeneratedBy => "CONCEPT-4",
+            Rule::MalformedActor => "CONCEPT-5",
         }
     }
 
@@ -58,6 +65,8 @@ impl Rule {
             Rule::DuplicateId => "duplicate concept id",
             Rule::DanglingLink => "dangling link",
             Rule::InvalidStatus => "invalid status",
+            Rule::MissingGeneratedBy => "missing generated.by",
+            Rule::MalformedActor => "malformed actor",
         }
     }
 
@@ -65,9 +74,12 @@ impl Rule {
     pub fn severity(self) -> Severity {
         match self {
             Rule::DanglingLink => Severity::Report,
-            Rule::NotAConcept | Rule::MissingType | Rule::DuplicateId | Rule::InvalidStatus => {
-                Severity::Defect
-            }
+            Rule::NotAConcept
+            | Rule::MissingType
+            | Rule::DuplicateId
+            | Rule::InvalidStatus
+            | Rule::MissingGeneratedBy
+            | Rule::MalformedActor => Severity::Defect,
         }
     }
 }
@@ -117,12 +129,14 @@ impl fmt::Display for Finding {
 mod tests {
     use super::*;
 
-    const ALL: [Rule; 5] = [
+    const ALL: [Rule; 7] = [
         Rule::NotAConcept,
         Rule::MissingType,
         Rule::DuplicateId,
         Rule::DanglingLink,
         Rule::InvalidStatus,
+        Rule::MissingGeneratedBy,
+        Rule::MalformedActor,
     ];
 
     #[test]
@@ -142,6 +156,8 @@ mod tests {
             Rule::MissingType,
             Rule::DuplicateId,
             Rule::InvalidStatus,
+            Rule::MissingGeneratedBy,
+            Rule::MalformedActor,
         ] {
             assert_eq!(rule.severity(), Severity::Defect, "{rule:?}");
         }

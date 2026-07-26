@@ -128,6 +128,27 @@ fn an_invalid_status_is_reported() {
     assert_eq!(bundle.findings()[0].file, "thing.md");
 }
 
+/// A declared `generated` block with no `by` is reported as CONCEPT-4 (§5.2).
+#[test]
+fn generated_without_by_is_reported() {
+    let bundle = Bundle::load(&fixture("bad-generated")).expect("loads");
+
+    assert_eq!(bundle.findings().len(), 1);
+    assert_eq!(bundle.findings()[0].rule, Rule::MissingGeneratedBy);
+    assert_eq!(bundle.findings()[0].file, "thing.md");
+}
+
+/// A `by` that is a bare token, not `producer/version` or `scheme:id`, is
+/// reported as CONCEPT-5 (§7).
+#[test]
+fn a_malformed_actor_is_reported() {
+    let bundle = Bundle::load(&fixture("bad-actor")).expect("loads");
+
+    assert_eq!(bundle.findings().len(), 1);
+    assert_eq!(bundle.findings()[0].rule, Rule::MalformedActor);
+    assert_eq!(bundle.findings()[0].file, "thing.md");
+}
+
 /// A concept's parent is the nearest path ancestor that is itself a concept;
 /// a directory-only scope (no concept file) contributes none.
 #[test]

@@ -220,7 +220,64 @@ fn check_concept(file: &str, concept: &Concept) -> Vec<Finding> {
         ));
     }
 
+    // CONCEPT-4 / CONCEPT-5: a declared `generated` needs a `by` (§5.2), and it
+    // must be a well-formed actor (§7).
+    if fm.declares("generated") {
+        match fm.generated().and_then(|g| g.by) {
+            None => findings.push(Finding::new(
+                file,
+                Rule::MissingGeneratedBy,
+                "`generated` declares no `by` (SPEC §5.2)",
+            )),
+            Some(by) if by.trim().is_empty() => findings.push(Finding::new(
+                file,
+                Rule::MissingGeneratedBy,
+                "`generated.by` is empty (SPEC §5.2)",
+            )),
+            Some(by) => findings.extend(actor_finding(file, "generated.by", &by)),
+        }
+    }
+
+    // CONCEPT-5: every `verified[].by` must be a well-formed actor (§7).
+    for (i, event) in fm.verified().iter().enumerate() {
+        if let Some(by) = event.by.as_deref() {
+            findings.extend(actor_finding(file, &format!("verified[{i}].by"), by));
+        }
+    }
+
     findings
+}
+
+/// A `CONCEPT-5` finding when `value` is present but not a well-formed actor.
+///
+/// An actor is read permissively — `producer/version` or `scheme:id` — because
+/// §7's three-form list excludes its own §5.1 `team:` example. See
+/// `docs/okf-friction.md`.
+fn actor_finding(file: &str, field: &str, value: &str) -> Option<Finding> {
+    if is_actor(value) {
+        return None;
+    }
+    Some(Finding::new(
+        file,
+        Rule::MalformedActor,
+        format!("`{field}` = `{value}` is not a `producer/version` or `scheme:id` actor (SPEC §7)"),
+    ))
+}
+
+/// A well-formed actor (§7), read permissively (see [`actor_finding`]): a
+/// `producer/version` pair, or a `scheme:id` with a non-empty scheme and id.
+fn is_actor(value: &str) -> bool {
+    if let Some((producer, version)) = value.split_once('/') {
+        return !producer.is_empty() && !version.is_empty();
+    }
+    if let Some((scheme, id)) = value.split_once(':') {
+        return !scheme.is_empty()
+            && !id.is_empty()
+            && scheme
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-');
+    }
+    false
 }
 
 /// A `*.md` file.
