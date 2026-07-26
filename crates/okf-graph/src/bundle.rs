@@ -1,0 +1,188 @@
+//! A whole OKF Knowledge Bundle loaded into memory: the concepts a directory
+//! tree yields, keyed by Concept ID, and the findings the load produced.
+//!
+//! The walk reuses the shape of `deon`'s `okf.rs::collect` — recurse a
+//! directory for `*.md`, read each file — but this crate owns identity: a
+//! Concept ID is the file's bundle-relative path with `.md` removed (SPEC §2),
+//! and the reserved `index.md` / `log.md` are excluded from the concept set
+//! (§3.1); their own structure is validated elsewhere.
+
+use std::collections::btree_map::{BTreeMap, Entry};
+use std::path::Path;
+
+use crate::{Concept, Finding, Rule};
+
+/// An OKF Knowledge Bundle: its concepts by Concept ID, plus the findings the
+/// load produced.
+#[derive(Debug, Clone, Default)]
+pub struct Bundle {
+    concepts: BTreeMap<String, Concept>,
+    findings: Vec<Finding>,
+}
+
+impl Bundle {
+    /// Load a bundle from a directory tree.
+    ///
+    /// Every `*.md` outside the reserved names becomes a concept keyed by its
+    /// Concept ID. IO errors (an unreadable directory or file) propagate; a
+    /// file that is not a well-formed concept does not — it becomes a finding,
+    /// so one malformed document never blocks the rest of the bundle.
+    pub fn load(root: &Path) -> std::io::Result<Bundle> {
+        let mut bundle = Bundle::default();
+        collect(root, root, &mut bundle)?;
+        Ok(bundle)
+    }
+
+    /// The concept with this Concept ID, if the bundle has one.
+    pub fn concept(&self, id: &str) -> Option<&Concept> {
+        self.concepts.get(id)
+    }
+
+    /// Every concept, as `(id, concept)` pairs, in Concept ID order.
+    pub fn concepts(&self) -> impl Iterator<Item = (&str, &Concept)> {
+        self.concepts.iter().map(|(id, c)| (id.as_str(), c))
+    }
+
+    /// Every finding the load produced.
+    pub fn findings(&self) -> &[Finding] {
+        &self.findings
+    }
+
+    /// Number of concepts (reserved files excluded).
+    pub fn len(&self) -> usize {
+        self.concepts.len()
+    }
+
+    /// Whether the bundle has no concepts.
+    pub fn is_empty(&self) -> bool {
+        self.concepts.is_empty()
+    }
+
+    /// Add a concept under its id, or report a duplicate.
+    ///
+    /// Distinct files give distinct ids within one tree, so `BUNDLE-1` cannot
+    /// fire from a well-formed bundle; the guard is defensive (a merged or
+    /// overlaid bundle, or symlink/case-fold aliasing, could collide). The first
+    /// file to claim an id keeps it, so resolution stays deterministic.
+    fn add_concept(&mut self, id: String, file: String, concept: Concept) {
+        match self.concepts.entry(id) {
+            Entry::Vacant(slot) => {
+                slot.insert(concept);
+            }
+            Entry::Occupied(slot) => {
+                let detail = format!(
+                    "Concept ID `{}` is already declared by another file",
+                    slot.key()
+                );
+                self.findings
+                    .push(Finding::new(file, Rule::DuplicateId, detail));
+            }
+        }
+    }
+}
+
+/// Recurse `path`, adding every non-reserved `*.md` to `out` as a concept.
+/// Directory entries are visited in path order so any per-file reporting is
+/// reproducible.
+fn collect(root: &Path, path: &Path, out: &mut Bundle) -> std::io::Result<()> {
+    if path.is_dir() {
+        let mut entries: Vec<_> = std::fs::read_dir(path)?
+            .collect::<std::io::Result<Vec<_>>>()?
+            .into_iter()
+            .map(|e| e.path())
+            .collect();
+        entries.sort();
+        for entry in entries {
+            collect(root, &entry, out)?;
+        }
+    } else if is_markdown(path) && !is_reserved(path) {
+        let file = rel_path(root, path);
+        let text = std::fs::read_to_string(path)?;
+        match Concept::parse(&text) {
+            Ok(concept) => {
+                if concept_type_missing(&concept) {
+                    out.findings.push(Finding::new(
+                        file.clone(),
+                        Rule::MissingType,
+                        "concept declares no non-empty `type` (SPEC §11)",
+                    ));
+                }
+                let id = strip_md(&file);
+                out.add_concept(id, file, concept);
+            }
+            Err(err) => out.findings.push(Finding::new(
+                file,
+                Rule::NotAConcept,
+                format!("not a concept document: {err}"),
+            )),
+        }
+    }
+    Ok(())
+}
+
+/// A concept with no `type`, or a `type` that is blank (§11 requires it
+/// non-empty). Absent and empty are both defects, and both trip `CONCEPT-2`.
+fn concept_type_missing(concept: &Concept) -> bool {
+    concept
+        .frontmatter()
+        .concept_type()
+        .is_none_or(|t| t.trim().is_empty())
+}
+
+/// A `*.md` file.
+fn is_markdown(path: &Path) -> bool {
+    path.extension().is_some_and(|e| e == "md")
+}
+
+/// A reserved filename (`index.md` / `log.md`), at any level (§3.1).
+fn is_reserved(path: &Path) -> bool {
+    matches!(
+        path.file_name().and_then(|n| n.to_str()),
+        Some("index.md" | "log.md")
+    )
+}
+
+/// A file's path relative to the bundle root, `/`-joined — the locator a
+/// finding is reported against, e.g. `tables/orders.md`.
+fn rel_path(root: &Path, path: &Path) -> String {
+    let rel = path.strip_prefix(root).unwrap_or(path);
+    rel.to_string_lossy()
+        .replace(std::path::MAIN_SEPARATOR, "/")
+}
+
+/// The Concept ID for a relative path: the trailing `.md` removed (§2).
+/// `tables/orders.md` → `tables/orders`.
+fn strip_md(file: &str) -> String {
+    file.strip_suffix(".md").unwrap_or(file).to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A duplicate Concept ID cannot arise from a single filesystem tree, so the
+    /// defensive `BUNDLE-1` guard is exercised directly: the first file keeps the
+    /// id and the second is reported.
+    #[test]
+    fn a_duplicate_concept_id_is_reported_and_the_first_file_wins() {
+        let mut bundle = Bundle::default();
+        let first = Concept::parse("---\ntype: First\n---\n").expect("parses");
+        let second = Concept::parse("---\ntype: Second\n---\n").expect("parses");
+
+        bundle.add_concept("dup".into(), "a.md".into(), first);
+        bundle.add_concept("dup".into(), "b.md".into(), second);
+
+        assert_eq!(bundle.len(), 1);
+        assert_eq!(
+            bundle.concept("dup").unwrap().frontmatter().concept_type(),
+            Some("First")
+        );
+        let dups: Vec<_> = bundle
+            .findings()
+            .iter()
+            .filter(|f| f.rule == Rule::DuplicateId)
+            .collect();
+        assert_eq!(dups.len(), 1);
+        assert_eq!(dups[0].file, "b.md");
+    }
+}
