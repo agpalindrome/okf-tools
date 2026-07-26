@@ -10,13 +10,26 @@
 use std::collections::btree_map::{BTreeMap, Entry};
 use std::path::Path;
 
+use crate::links::{links_in, Link, LinkKind};
 use crate::{Concept, Finding, Rule};
 
-/// An OKF Knowledge Bundle: its concepts by Concept ID, plus the findings the
-/// load produced.
+/// A resolved body-link edge: the linking concept points at another concept in
+/// the same bundle (SPEC §6). A link that resolves to no concept is a dangling
+/// `BUNDLE-2` report instead, and never an edge.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BodyLink {
+    /// Concept ID of the concept whose body carries the link.
+    pub from: String,
+    /// Concept ID the link resolves to.
+    pub to: String,
+}
+
+/// An OKF Knowledge Bundle: its concepts by Concept ID, the resolved body-link
+/// edges, and the findings the load produced.
 #[derive(Debug, Clone, Default)]
 pub struct Bundle {
     concepts: BTreeMap<String, Concept>,
+    links: Vec<BodyLink>,
     findings: Vec<Finding>,
 }
 
@@ -30,6 +43,7 @@ impl Bundle {
     pub fn load(root: &Path) -> std::io::Result<Bundle> {
         let mut bundle = Bundle::default();
         collect(root, root, &mut bundle)?;
+        bundle.resolve_links();
         Ok(bundle)
     }
 
@@ -41,6 +55,12 @@ impl Bundle {
     /// Every concept, as `(id, concept)` pairs, in Concept ID order.
     pub fn concepts(&self) -> impl Iterator<Item = (&str, &Concept)> {
         self.concepts.iter().map(|(id, c)| (id.as_str(), c))
+    }
+
+    /// Every resolved body-link edge, in `(from, to)` Concept ID order of the
+    /// linking concept, then document order within a body.
+    pub fn links(&self) -> &[BodyLink] {
+        &self.links
     }
 
     /// Every finding the load produced.
@@ -78,6 +98,39 @@ impl Bundle {
                     .push(Finding::new(file, Rule::DuplicateId, detail));
             }
         }
+    }
+
+    /// Resolve every concept's body links against the loaded concept set: a link
+    /// that lands on a concept becomes an edge, one that lands nowhere becomes a
+    /// dangling `BUNDLE-2` report. Runs after every concept is known, so a
+    /// forward reference resolves regardless of load order.
+    fn resolve_links(&mut self) {
+        let mut edges = Vec::new();
+        let mut findings = Vec::new();
+        for (from, concept) in &self.concepts {
+            for link in links_in(concept.body().as_str()) {
+                let Some(to) = resolve_concept_target(from, &link) else {
+                    continue;
+                };
+                if self.concepts.contains_key(&to) {
+                    edges.push(BodyLink {
+                        from: from.clone(),
+                        to,
+                    });
+                } else {
+                    findings.push(Finding::new(
+                        format!("{from}.md"),
+                        Rule::DanglingLink,
+                        format!(
+                            "link to `{}` resolves to no concept in the bundle",
+                            link.target
+                        ),
+                    ));
+                }
+            }
+        }
+        self.links = edges;
+        self.findings.extend(findings);
     }
 }
 
@@ -156,6 +209,39 @@ fn strip_md(file: &str) -> String {
     file.strip_suffix(".md").unwrap_or(file).to_string()
 }
 
+/// The Concept ID a body link points at, or `None` when the link cannot name a
+/// concept (external, a bare fragment, or a target that is not a `.md` file).
+///
+/// A bundle-absolute target resolves from the root; a relative one from the
+/// linking concept's directory, applying `.`/`..` (`..` past the root is
+/// clamped). The `#fragment` is dropped before resolving.
+fn resolve_concept_target(from: &str, link: &Link) -> Option<String> {
+    let mut segments: Vec<&str> = match link.kind {
+        LinkKind::BundleAbsolute => Vec::new(),
+        LinkKind::Relative => {
+            let mut dir: Vec<&str> = from.split('/').collect();
+            dir.pop(); // the concept's own name, not part of its directory
+            dir
+        }
+        LinkKind::External | LinkKind::Fragment => return None,
+    };
+    let path = link.target.split('#').next().unwrap_or("");
+    let path = path.strip_prefix('/').unwrap_or(path);
+    if !path.ends_with(".md") {
+        return None;
+    }
+    for part in path.split('/') {
+        match part {
+            "" | "." => {}
+            ".." => {
+                segments.pop();
+            }
+            name => segments.push(name),
+        }
+    }
+    Some(strip_md(&segments.join("/")))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -184,5 +270,45 @@ mod tests {
             .collect();
         assert_eq!(dups.len(), 1);
         assert_eq!(dups[0].file, "b.md");
+    }
+
+    fn link(target: &str, kind: LinkKind) -> Link {
+        Link {
+            target: target.to_string(),
+            kind,
+        }
+    }
+
+    #[test]
+    fn resolution_normalises_absolute_and_relative_targets() {
+        // absolute ignores the linker; the leading `/`, the `.md`, and a
+        // trailing `#fragment` are all stripped.
+        assert_eq!(
+            resolve_concept_target("anywhere", &link("/a/b.md#x", LinkKind::BundleAbsolute))
+                .as_deref(),
+            Some("a/b")
+        );
+        // relative resolves against the linker's directory, applying `..`.
+        assert_eq!(
+            resolve_concept_target("a/b/c", &link("../sibling.md", LinkKind::Relative)).as_deref(),
+            Some("a/sibling")
+        );
+    }
+
+    #[test]
+    fn a_non_concept_target_resolves_to_nothing() {
+        assert_eq!(
+            resolve_concept_target("a", &link("https://x", LinkKind::External)),
+            None
+        );
+        assert_eq!(
+            resolve_concept_target("a", &link("#section", LinkKind::Fragment)),
+            None
+        );
+        // a directory link is not a concept link.
+        assert_eq!(
+            resolve_concept_target("a", &link("/tables/", LinkKind::BundleAbsolute)),
+            None
+        );
     }
 }

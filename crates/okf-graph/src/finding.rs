@@ -29,6 +29,10 @@ pub enum Rule {
     MissingType,
     /// BUNDLE-1: two concept files resolve to the same Concept ID (§2).
     DuplicateId,
+    /// BUNDLE-2: a body link resolves to no concept in the bundle (§6). A
+    /// report, not a defect — the spec says a broken link may just be
+    /// not-yet-written knowledge.
+    DanglingLink,
 }
 
 impl Rule {
@@ -38,6 +42,7 @@ impl Rule {
             Rule::NotAConcept => "CONCEPT-1",
             Rule::MissingType => "CONCEPT-2",
             Rule::DuplicateId => "BUNDLE-1",
+            Rule::DanglingLink => "BUNDLE-2",
         }
     }
 
@@ -47,12 +52,14 @@ impl Rule {
             Rule::NotAConcept => "not a concept document",
             Rule::MissingType => "missing type",
             Rule::DuplicateId => "duplicate concept id",
+            Rule::DanglingLink => "dangling link",
         }
     }
 
     /// Whether this rule is a defect or a tolerated report.
     pub fn severity(self) -> Severity {
         match self {
+            Rule::DanglingLink => Severity::Report,
             Rule::NotAConcept | Rule::MissingType | Rule::DuplicateId => Severity::Defect,
         }
     }
@@ -103,7 +110,12 @@ impl fmt::Display for Finding {
 mod tests {
     use super::*;
 
-    const ALL: [Rule; 3] = [Rule::NotAConcept, Rule::MissingType, Rule::DuplicateId];
+    const ALL: [Rule; 4] = [
+        Rule::NotAConcept,
+        Rule::MissingType,
+        Rule::DuplicateId,
+        Rule::DanglingLink,
+    ];
 
     #[test]
     fn every_rule_has_a_unique_code_and_a_title() {
@@ -115,8 +127,9 @@ mod tests {
     }
 
     #[test]
-    fn the_base_rules_are_all_defects() {
-        for rule in ALL {
+    fn severity_splits_the_tolerated_report_from_the_defects() {
+        assert_eq!(Rule::DanglingLink.severity(), Severity::Report);
+        for rule in [Rule::NotAConcept, Rule::MissingType, Rule::DuplicateId] {
             assert_eq!(rule.severity(), Severity::Defect, "{rule:?}");
         }
     }
