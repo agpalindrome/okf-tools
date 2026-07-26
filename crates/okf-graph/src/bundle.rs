@@ -264,6 +264,35 @@ fn check_concept(file: &str, concept: &Concept) -> Vec<Finding> {
         }
     }
 
+    // §10 Attested Computation — type-conditional: these apply only to a concept
+    // whose `type` is exactly `Attested Computation`.
+    if fm.concept_type() == Some("Attested Computation") {
+        // CONCEPT-7: `runtime` is required for the type (§10.2).
+        if fm.runtime().is_none_or(|r| r.trim().is_empty()) {
+            findings.push(Finding::new(
+                file,
+                Rule::MissingRuntime,
+                "an Attested Computation declares no `runtime` (SPEC §10.2)",
+            ));
+        }
+
+        // CONCEPT-8: the computation must come from exactly one place (§10.3) —
+        // a `computation:` path or a `# Computation` body block, not both, not
+        // neither.
+        let has_path = fm.computation().is_some_and(|c| !c.trim().is_empty());
+        let has_body = concept.body().has_computation_section();
+        if has_path == has_body {
+            let detail = if has_path {
+                "an Attested Computation gives its computation twice — a `computation:` \
+                 path and a `# Computation` body block (SPEC §10.3)"
+            } else {
+                "an Attested Computation gives its computation nowhere — neither a \
+                 `computation:` path nor a `# Computation` body block (SPEC §10.3)"
+            };
+            findings.push(Finding::new(file, Rule::InvalidComputationSource, detail));
+        }
+    }
+
     findings
 }
 

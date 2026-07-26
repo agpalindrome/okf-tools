@@ -43,6 +43,13 @@ pub enum Rule {
     MalformedActor,
     /// CONCEPT-6: a `sources` entry declares no `resource` (§5.1 REQUIRED).
     MissingSourceResource,
+    /// CONCEPT-7: an `Attested Computation` concept declares no `runtime`
+    /// (§10.2 REQUIRED for the type).
+    MissingRuntime,
+    /// CONCEPT-8: an `Attested Computation` gives its computation in neither or
+    /// both of the two §10.3 places (a `computation:` path xor a `# Computation`
+    /// body block) — it must be exactly one.
+    InvalidComputationSource,
 }
 
 impl Rule {
@@ -57,6 +64,8 @@ impl Rule {
             Rule::MissingGeneratedBy => "CONCEPT-4",
             Rule::MalformedActor => "CONCEPT-5",
             Rule::MissingSourceResource => "CONCEPT-6",
+            Rule::MissingRuntime => "CONCEPT-7",
+            Rule::InvalidComputationSource => "CONCEPT-8",
         }
     }
 
@@ -71,6 +80,8 @@ impl Rule {
             Rule::MissingGeneratedBy => "missing generated.by",
             Rule::MalformedActor => "malformed actor",
             Rule::MissingSourceResource => "missing source resource",
+            Rule::MissingRuntime => "missing runtime",
+            Rule::InvalidComputationSource => "invalid computation source",
         }
     }
 
@@ -84,7 +95,9 @@ impl Rule {
             | Rule::InvalidStatus
             | Rule::MissingGeneratedBy
             | Rule::MalformedActor
-            | Rule::MissingSourceResource => Severity::Defect,
+            | Rule::MissingSourceResource
+            | Rule::MissingRuntime
+            | Rule::InvalidComputationSource => Severity::Defect,
         }
     }
 }
@@ -134,7 +147,7 @@ impl fmt::Display for Finding {
 mod tests {
     use super::*;
 
-    const ALL: [Rule; 8] = [
+    const ALL: [Rule; 10] = [
         Rule::NotAConcept,
         Rule::MissingType,
         Rule::DuplicateId,
@@ -143,6 +156,8 @@ mod tests {
         Rule::MissingGeneratedBy,
         Rule::MalformedActor,
         Rule::MissingSourceResource,
+        Rule::MissingRuntime,
+        Rule::InvalidComputationSource,
     ];
 
     #[test]
@@ -165,6 +180,8 @@ mod tests {
             Rule::MissingGeneratedBy,
             Rule::MalformedActor,
             Rule::MissingSourceResource,
+            Rule::MissingRuntime,
+            Rule::InvalidComputationSource,
         ] {
             assert_eq!(rule.severity(), Severity::Defect, "{rule:?}");
         }
