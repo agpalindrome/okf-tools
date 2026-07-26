@@ -245,6 +245,25 @@ fn check_concept(file: &str, concept: &Concept) -> Vec<Finding> {
         }
     }
 
+    // CONCEPT-6 / CONCEPT-5: each source needs a `resource` (§5.1 REQUIRED), and
+    // an `author`, if present, must be a well-formed actor (§7).
+    for (i, source) in fm.sources().iter().enumerate() {
+        if source
+            .resource
+            .as_deref()
+            .is_none_or(|r| r.trim().is_empty())
+        {
+            findings.push(Finding::new(
+                file,
+                Rule::MissingSourceResource,
+                format!("`sources[{i}]` declares no `resource` (SPEC §5.1)"),
+            ));
+        }
+        if let Some(author) = source.author.as_deref() {
+            findings.extend(actor_finding(file, &format!("sources[{i}].author"), author));
+        }
+    }
+
     findings
 }
 

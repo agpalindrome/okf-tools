@@ -299,6 +299,41 @@ fn a_bare_verified_mapping_counts_as_one() {
     assert_eq!(verified[0].by.as_deref(), Some("human:x"));
 }
 
+/// `sources` and the shared `usage_window` read back — the credibility signals
+/// and the date range (§5.1).
+#[test]
+fn reads_sources_and_the_shared_usage_window() {
+    let src = "\
+---
+type: Reference
+sources:
+  - id: ga4
+    resource: https://example.com/schema
+    author: team:ga4-docs
+    usage_count: 5000
+    last_modified: 2026-05-30
+usage_window: { from: 2026-06-01, to: 2026-06-30 }
+---
+";
+    let concept = Concept::parse(src).expect("parses");
+    let front = concept.frontmatter();
+
+    let sources = front.sources();
+    assert_eq!(sources.len(), 1);
+    assert_eq!(sources[0].id.as_deref(), Some("ga4"));
+    assert_eq!(
+        sources[0].resource.as_deref(),
+        Some("https://example.com/schema")
+    );
+    assert_eq!(sources[0].author.as_deref(), Some("team:ga4-docs"));
+    assert_eq!(sources[0].usage_count, Some(5000));
+    assert_eq!(sources[0].last_modified.as_deref(), Some("2026-05-30"));
+
+    let window = front.usage_window().expect("shared usage_window");
+    assert_eq!(window.from.as_deref(), Some("2026-06-01"));
+    assert_eq!(window.to.as_deref(), Some("2026-06-30"));
+}
+
 /// A CRLF file splits like any other: the fences tolerate the carriage return.
 #[test]
 fn crlf_line_endings_split_the_same_way() {

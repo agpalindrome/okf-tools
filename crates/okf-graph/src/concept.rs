@@ -175,6 +175,24 @@ impl Frontmatter {
         }
     }
 
+    /// `sources` — the materials a concept derives from (§5.1). Each entry's
+    /// `resource` is required, but a missing one still reads (as
+    /// `Source { resource: None, .. }`) so a check can locate it; non-mapping
+    /// entries are dropped, and an absent or non-list `sources` reads as empty.
+    pub fn sources(&self) -> Vec<Source> {
+        match self.fields.get("sources") {
+            Some(Value::Sequence(items)) => items.iter().filter_map(source_entry).collect(),
+            _ => Vec::new(),
+        }
+    }
+
+    /// `usage_window` — the shared `{ from, to }` range that frames every
+    /// source's `usage_count` (§5.1). A single source may carry its own; this
+    /// reads the bundle-wide sibling.
+    pub fn usage_window(&self) -> Option<UsageWindow> {
+        self.fields.get("usage_window").and_then(usage_window)
+    }
+
     /// The block exactly as written, fences excluded. §4.1 lets producers add
     /// any keys and *requires* consumers not to reject unknown ones, so
     /// extension keys — and the §5 families — survive here: the payload a
@@ -231,11 +249,62 @@ pub struct Verification {
     pub at: Option<String>,
 }
 
+/// One `sources` entry (§5.1): a material a concept derives from, and the
+/// per-source credibility signals. `resource` is required by the spec, but is
+/// `Option` here so a missing one can be read and then reported.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Source {
+    /// A stable key used to attribute individual claims.
+    pub id: Option<String>,
+    /// The artifact or scope the concept derives from (required by §5.1).
+    pub resource: Option<String>,
+    /// A human-readable label.
+    pub title: Option<String>,
+    /// Who or what produced the source, in the actor convention (§7).
+    pub author: Option<String>,
+    /// How often `resource` was exercised over the `usage_window`.
+    pub usage_count: Option<i64>,
+    /// When the source itself last changed (`YYYY-MM-DD`).
+    pub last_modified: Option<String>,
+    /// A per-source `{ from, to }` range overriding the shared one.
+    pub usage_window: Option<UsageWindow>,
+}
+
+/// The `{ from, to }` date range that frames a `usage_count` (§5.1).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UsageWindow {
+    /// Start of the window (`YYYY-MM-DD`).
+    pub from: Option<String>,
+    /// End of the window (`YYYY-MM-DD`).
+    pub to: Option<String>,
+}
+
 /// Read one `{ by, at }` event from a value, if it is a mapping.
 fn verification(value: &Value) -> Option<Verification> {
     value.is_mapping().then(|| Verification {
         by: str_at(value, "by"),
         at: str_at(value, "at"),
+    })
+}
+
+/// Read one `sources` entry from a value, if it is a mapping.
+fn source_entry(value: &Value) -> Option<Source> {
+    value.is_mapping().then(|| Source {
+        id: str_at(value, "id"),
+        resource: str_at(value, "resource"),
+        title: str_at(value, "title"),
+        author: str_at(value, "author"),
+        usage_count: value.get("usage_count").and_then(Value::as_i64),
+        last_modified: str_at(value, "last_modified"),
+        usage_window: value.get("usage_window").and_then(usage_window),
+    })
+}
+
+/// Read a `{ from, to }` window from a value, if it is a mapping.
+fn usage_window(value: &Value) -> Option<UsageWindow> {
+    value.is_mapping().then(|| UsageWindow {
+        from: str_at(value, "from"),
+        to: str_at(value, "to"),
     })
 }
 

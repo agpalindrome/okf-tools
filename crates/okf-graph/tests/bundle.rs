@@ -149,6 +149,16 @@ fn a_malformed_actor_is_reported() {
     assert_eq!(bundle.findings()[0].file, "thing.md");
 }
 
+/// A `sources` entry with no `resource` is reported as CONCEPT-6 (§5.1).
+#[test]
+fn a_source_without_resource_is_reported() {
+    let bundle = Bundle::load(&fixture("bad-sources")).expect("loads");
+
+    assert_eq!(bundle.findings().len(), 1);
+    assert_eq!(bundle.findings()[0].rule, Rule::MissingSourceResource);
+    assert_eq!(bundle.findings()[0].file, "thing.md");
+}
+
 /// A concept's parent is the nearest path ancestor that is itself a concept;
 /// a directory-only scope (no concept file) contributes none.
 #[test]

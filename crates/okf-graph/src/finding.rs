@@ -41,6 +41,8 @@ pub enum Rule {
     /// CONCEPT-5: an actor field (`generated.by`, `verified[].by`, or a source
     /// `author`) does not match the §7 convention.
     MalformedActor,
+    /// CONCEPT-6: a `sources` entry declares no `resource` (§5.1 REQUIRED).
+    MissingSourceResource,
 }
 
 impl Rule {
@@ -54,6 +56,7 @@ impl Rule {
             Rule::InvalidStatus => "CONCEPT-3",
             Rule::MissingGeneratedBy => "CONCEPT-4",
             Rule::MalformedActor => "CONCEPT-5",
+            Rule::MissingSourceResource => "CONCEPT-6",
         }
     }
 
@@ -67,6 +70,7 @@ impl Rule {
             Rule::InvalidStatus => "invalid status",
             Rule::MissingGeneratedBy => "missing generated.by",
             Rule::MalformedActor => "malformed actor",
+            Rule::MissingSourceResource => "missing source resource",
         }
     }
 
@@ -79,7 +83,8 @@ impl Rule {
             | Rule::DuplicateId
             | Rule::InvalidStatus
             | Rule::MissingGeneratedBy
-            | Rule::MalformedActor => Severity::Defect,
+            | Rule::MalformedActor
+            | Rule::MissingSourceResource => Severity::Defect,
         }
     }
 }
@@ -129,7 +134,7 @@ impl fmt::Display for Finding {
 mod tests {
     use super::*;
 
-    const ALL: [Rule; 7] = [
+    const ALL: [Rule; 8] = [
         Rule::NotAConcept,
         Rule::MissingType,
         Rule::DuplicateId,
@@ -137,6 +142,7 @@ mod tests {
         Rule::InvalidStatus,
         Rule::MissingGeneratedBy,
         Rule::MalformedActor,
+        Rule::MissingSourceResource,
     ];
 
     #[test]
@@ -158,6 +164,7 @@ mod tests {
             Rule::InvalidStatus,
             Rule::MissingGeneratedBy,
             Rule::MalformedActor,
+            Rule::MissingSourceResource,
         ] {
             assert_eq!(rule.severity(), Severity::Defect, "{rule:?}");
         }
