@@ -68,8 +68,32 @@ block," or should §10.2's example be changed to a fenced block?
 **Raised upstream** 2026-07-26 as
 [GoogleCloudPlatform/knowledge-catalog#235][issue-235].
 
+## 2026-07-26 — a scope descriptor is indistinguishable from a path
+
+[§5.1][s51] says a `sources[].resource` is *either* a followable path (a URL, a
+bundle-relative path, or a `references/…` path) *or* "a population or scope
+descriptor it cannot [follow]" — `all queries in BigQuery project X`. [§6.2][s62]
+restates it: "in which case it is not a path." But neither gives a consumer a
+syntactic way to tell the two apart, so a tool that resolves `sources` and
+flags a `resource` pointing nowhere has to guess which it is holding.
+
+**How okf-graph handles it.** It classifies a `sources[].resource` as a scope
+descriptor when it is non-URL, non-`/`-rooted, and **contains a space** — natural
+language rather than a path. Fragile both ways (a single-token scope, or a path
+with a `%20`/space), but it errs toward *not* reporting a dangling path, so a
+scope descriptor is never mistaken for a broken one.
+
+**The question for upstream.** Should a scope descriptor carry a marker (a
+distinct key, or a structured `resource: { scope: … }`) so tooling stops
+inferring intent from punctuation?
+
+**Raised upstream** 2026-07-26 as
+[GoogleCloudPlatform/knowledge-catalog#236][issue-236].
+
 [issue]: https://github.com/GoogleCloudPlatform/knowledge-catalog/issues/234
 [issue-235]: https://github.com/GoogleCloudPlatform/knowledge-catalog/issues/235
+[issue-236]: https://github.com/GoogleCloudPlatform/knowledge-catalog/issues/236
+[s62]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md#62-path-valued-fields
 [s7]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md#7-actor-convention
 [s51]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md#51-provenance-sources
 [s102]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md#102-contract-fields
