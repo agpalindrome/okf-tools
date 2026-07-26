@@ -28,7 +28,9 @@
 mod bundle;
 mod concept;
 mod finding;
+mod links;
 
 pub use bundle::Bundle;
 pub use concept::{Body, Concept, ConceptError, Frontmatter};
 pub use finding::{Finding, Rule, Severity};
+pub use links::{links_in, Link, LinkKind};

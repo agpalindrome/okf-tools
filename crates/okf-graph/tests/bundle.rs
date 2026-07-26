@@ -3,7 +3,7 @@
 
 use std::path::PathBuf;
 
-use okf_graph::{Bundle, Rule};
+use okf_graph::{Bundle, Rule, Severity};
 
 fn fixture(name: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -72,4 +72,74 @@ fn a_typeless_concept_is_loaded_but_reported() {
     assert_eq!(bundle.findings().len(), 1);
     assert_eq!(bundle.findings()[0].rule, Rule::MissingType);
     assert_eq!(bundle.findings()[0].file, "untyped.md");
+}
+
+/// The clean bundle's body links resolve — both a bundle-absolute and a
+/// relative form — to edges, and it still reports nothing.
+#[test]
+fn resolved_body_links_become_edges() {
+    let bundle = Bundle::load(&fixture("clean")).expect("loads");
+
+    let mut edges: Vec<(&str, &str)> = bundle
+        .links()
+        .iter()
+        .map(|e| (e.from.as_str(), e.to.as_str()))
+        .collect();
+    edges.sort();
+    assert_eq!(
+        edges,
+        [
+            ("overview", "tables/customers"),
+            ("overview", "tables/orders"),
+        ]
+    );
+    assert!(bundle.findings().is_empty());
+}
+
+/// A dangling body link is surfaced as a BUNDLE-2 report and does not become an
+/// edge — but it is a report, not a defect, so it must never fail a run (§6).
+#[test]
+fn a_dangling_link_is_reported_as_a_report_not_a_defect() {
+    let bundle = Bundle::load(&fixture("dangling")).expect("loads");
+
+    assert!(bundle.links().is_empty());
+    assert_eq!(bundle.findings().len(), 1);
+    assert_eq!(bundle.findings()[0].rule, Rule::DanglingLink);
+    assert_eq!(bundle.findings()[0].file, "note.md");
+    assert!(
+        bundle
+            .findings()
+            .iter()
+            .all(|f| f.severity() == Severity::Report),
+        "a dangling link must not be a defect"
+    );
+}
+
+/// A concept's parent is the nearest path ancestor that is itself a concept;
+/// a directory-only scope (no concept file) contributes none.
+#[test]
+fn parent_is_the_nearest_concept_ancestor() {
+    let bundle = Bundle::load(&fixture("hierarchy")).expect("loads");
+
+    assert_eq!(bundle.parent("datasets"), None);
+    assert_eq!(bundle.parent("datasets/sales"), Some("datasets"));
+    assert_eq!(
+        bundle.parent("datasets/sales/detail"),
+        Some("datasets/sales")
+    );
+    assert_eq!(bundle.parent("orphan/deep"), None);
+}
+
+/// Children invert the parent relation, so a grandchild attaches to its nearest
+/// concept ancestor rather than to every ancestor above it.
+#[test]
+fn children_attach_to_their_nearest_concept_ancestor() {
+    let bundle = Bundle::load(&fixture("hierarchy")).expect("loads");
+
+    assert_eq!(bundle.children("datasets"), vec!["datasets/sales"]);
+    assert_eq!(
+        bundle.children("datasets/sales"),
+        vec!["datasets/sales/detail"]
+    );
+    assert!(bundle.children("orphan/deep").is_empty());
 }
