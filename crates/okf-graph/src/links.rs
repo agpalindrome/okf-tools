@@ -1,14 +1,14 @@
 //! Extracting and classifying the markdown links in a concept body (§6.1).
 //!
 //! Handles **inline** `[text](target)` links (including the `(target "title")`
-//! and `(<target>)` forms) and skips fenced code blocks. Two forms are **not**
-//! handled yet, and are documented rather than dropped silently — a missed link
-//! is a missed dangling edge, which is exactly the bug this crate exists to
-//! catch (issue #54):
+//! and `(<target>)` forms), skips fenced code blocks, and ignores links inside
+//! an inline code span (`` `[x](y)` `` is code, not a link). A code span that
+//! runs across lines (rare; fenced blocks are handled separately) is the one
+//! residual — masking is per line.
 //!
-//! - reference-style links (`[text][ref]` + `[ref]: …`), and
-//! - links inside an inline code span (`` `[x](y)` ``), which this scanner does
-//!   not exclude.
+//! Reference-style links (`[text][ref]` + `[ref]: …`) are not handled yet, and
+//! are documented rather than dropped silently — a missed link is a missed
+//! dangling edge, which is exactly the bug this crate exists to catch (#54).
 //!
 //! Resolution to a Concept ID is a separate step (it needs the whole bundle);
 //! this module only reads a body and says what each link *is*.
@@ -56,8 +56,11 @@ pub fn links_in(body: &str) -> Vec<Link> {
 
 /// Scan one line for `[text](target)` links, pushing each target found. The
 /// `](` marker is the anchor; the link text before it is not needed here.
+/// Inline code spans are masked first, so a `` `[x](y)` `` inside code is not
+/// mistaken for a link.
 fn extract_line(line: &str, out: &mut Vec<Link>) {
-    let mut rest = line;
+    let masked = mask_code_spans(line);
+    let mut rest = masked.as_str();
     while let Some(pos) = rest.find("](") {
         let after = &rest[pos + 2..];
         match parse_target(after) {
@@ -73,6 +76,47 @@ fn extract_line(line: &str, out: &mut Vec<Link>) {
             None => rest = after,
         }
     }
+}
+
+/// Blank out inline code spans — a run of N backticks opens a span the next run
+/// of exactly N backticks closes — so a `` `[x](y)` `` inside code is not read
+/// as a link. Masked bytes become spaces, preserving every offset so the
+/// surrounding text (and any real link in it) is untouched; an unclosed run is
+/// left as-is.
+fn mask_code_spans(line: &str) -> String {
+    let bytes = line.as_bytes();
+    let mut out = bytes.to_vec();
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] != b'`' {
+            i += 1;
+            continue;
+        }
+        let run = bytes[i..].iter().take_while(|&&b| b == b'`').count();
+        let mut j = i + run;
+        let close = loop {
+            if j >= bytes.len() {
+                break None;
+            }
+            if bytes[j] == b'`' {
+                let here = bytes[j..].iter().take_while(|&&b| b == b'`').count();
+                if here == run {
+                    break Some(j);
+                }
+                j += here;
+            } else {
+                j += 1;
+            }
+        };
+        match close {
+            Some(close) => {
+                out[i..close + run].fill(b' ');
+                i = close + run;
+            }
+            None => i += run,
+        }
+    }
+    String::from_utf8(out).unwrap_or_else(|_| line.to_string())
 }
 
 /// Read a link target from the text just after `](`, returning the target and
@@ -181,6 +225,19 @@ not a [link](/nope.md)
 ```
 after [also-real](/b.md)";
         assert_eq!(targets(body), ["/a.md", "/b.md"]);
+    }
+
+    #[test]
+    fn a_link_inside_an_inline_code_span_is_ignored() {
+        // the code-span target is not a link; a real link beside it still is.
+        assert_eq!(
+            targets("use `[x](/code.md)` but see [real](/a.md)"),
+            ["/a.md"]
+        );
+        // a backticked target alone yields nothing.
+        assert!(targets("`[x](/only-code.md)`").is_empty());
+        // a double-backtick span is masked too.
+        assert_eq!(targets("``[x](/c.md)`` and [r](/b.md)"), ["/b.md"]);
     }
 
     #[test]
