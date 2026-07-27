@@ -102,6 +102,17 @@
         default = deonCheckFor system;
       });
 
+      # `nix run .#okf-graph -- <bundle>` runs the structural validator. The
+      # workspace build (deonCheckFor) already installs both binaries, so this
+      # points at its `bin/okf-graph`; `nix run .` stays `deon-check` via
+      # packages.default, leaving CLAUDE.md's documented invocation untouched.
+      apps = forAllSystems (system: {
+        okf-graph = {
+          type = "app";
+          program = "${deonCheckFor system}/bin/okf-graph";
+        };
+      });
+
       checks = forAllSystems (system: {
         pre-commit = hooksFor system;
         deon-check = deonCheckFor system;
