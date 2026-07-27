@@ -4,8 +4,7 @@ A structural / topological validator for an [Open Knowledge Format][okf-spec]
 (OKF) Knowledge Bundle. Given a bundle, `okf-graph` reads it as a knowledge
 graph and reports — quickly and rigorously — what is structurally wrong with
 it: what Concepts exist, what they are called, what points at what, what
-resolves and what dangles. A concept's body is carried as an _opaque payload_
-and never interpreted.
+resolves and what dangles.
 
 ## What it is (and is not)
 
@@ -17,10 +16,7 @@ limits follow, and both are load-bearing:
   fully conformant and wrong; expert review is that gate, and `okf-graph` does
   not stand in for it.
 - **Topology is not meaning.** `okf-graph` reads _that_ one concept points at
-  another, never _what_ the relationship means. OKF links are untyped, and the
-  meaning of a norm — obligation, defeat, the mechanical/judgment seam — is
-  `okf-normative`'s to read, one layer up. `okf-normative` depends on
-  `okf-graph`, never the reverse.
+  another, never _what_ the relationship means.
 
 ## What it checks
 
