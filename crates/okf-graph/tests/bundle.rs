@@ -360,6 +360,48 @@ fn a_reference_style_link_becomes_an_edge() {
     assert!(bundle.findings().is_empty());
 }
 
+/// A parameter missing one of `{name, type, required}` is CONCEPT-9, a report
+/// (§10.2 — parameters are a supporting field, not the required core).
+#[test]
+fn a_malformed_parameter_is_reported() {
+    let bundle = Bundle::load(&fixture("ac-bad-parameter")).expect("loads");
+
+    assert_eq!(bundle.findings().len(), 1);
+    assert_eq!(bundle.findings()[0].rule, Rule::MalformedParameter);
+    assert_eq!(bundle.findings()[0].severity(), Severity::Report);
+    assert_eq!(bundle.findings()[0].file, "thing.md");
+}
+
+/// An executor/attester with no `resource`, and a non-list `receipt`, are each
+/// CONCEPT-10 reports (§10.2 — the attestation machinery is a supporting field).
+#[test]
+fn an_incomplete_attestation_is_reported() {
+    let bundle = Bundle::load(&fixture("ac-incomplete-attestation")).expect("loads");
+
+    let incomplete: Vec<_> = bundle
+        .findings()
+        .iter()
+        .filter(|f| f.rule == Rule::IncompleteAttestation)
+        .collect();
+    // executor no resource, executor receipt not a list, attester no resource.
+    assert_eq!(incomplete.len(), 3);
+    assert!(incomplete.iter().all(|f| f.severity() == Severity::Report));
+    assert_eq!(bundle.findings().len(), 3, "{:?}", bundle.findings());
+}
+
+/// An Attested Computation whose sole source is an empty `# Computation`
+/// section delivers no computation — CONCEPT-11, a defect (the sibling of
+/// CONCEPT-8's "neither").
+#[test]
+fn an_empty_computation_section_is_a_defect() {
+    let bundle = Bundle::load(&fixture("ac-empty-computation")).expect("loads");
+
+    assert_eq!(bundle.findings().len(), 1);
+    assert_eq!(bundle.findings()[0].rule, Rule::EmptyComputation);
+    assert_eq!(bundle.findings()[0].severity(), Severity::Defect);
+    assert_eq!(bundle.findings()[0].file, "thing.md");
+}
+
 /// A concept's parent is the nearest path ancestor that is itself a concept;
 /// a directory-only scope (no concept file) contributes none.
 #[test]

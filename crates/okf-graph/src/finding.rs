@@ -76,6 +76,19 @@ pub enum Rule {
     /// LOG-3: a `log.md` entry link resolves to no concept, file, or directory
     /// (§9). A report — a broken link is tolerated (§6).
     DanglingLogEntry,
+    /// CONCEPT-9: an Attested Computation `parameters` entry is missing `name`,
+    /// `type`, or a boolean `required` (§10.2). A report — parameters are an
+    /// optional supporting field, not §10's required core.
+    MalformedParameter,
+    /// CONCEPT-10: an Attested Computation's `executor` / `attester` is
+    /// incomplete — no `resource`, or an `executor.receipt` that is not a list
+    /// (§10.2). A report — the attestation machinery is a supporting field.
+    IncompleteAttestation,
+    /// CONCEPT-11: an Attested Computation's `# Computation` section is empty
+    /// and there is no `computation:` path — the inline source is declared but
+    /// delivers nothing (§10.3). A defect: like CONCEPT-8, the computation is
+    /// the required core, and this one has none.
+    EmptyComputation,
 }
 
 impl Rule {
@@ -100,6 +113,9 @@ impl Rule {
             Rule::NonIsoLogDate => "LOG-1",
             Rule::LogOutOfOrder => "LOG-2",
             Rule::DanglingLogEntry => "LOG-3",
+            Rule::MalformedParameter => "CONCEPT-9",
+            Rule::IncompleteAttestation => "CONCEPT-10",
+            Rule::EmptyComputation => "CONCEPT-11",
         }
     }
 
@@ -124,6 +140,9 @@ impl Rule {
             Rule::NonIsoLogDate => "non-ISO log date",
             Rule::LogOutOfOrder => "log out of order",
             Rule::DanglingLogEntry => "dangling log entry",
+            Rule::MalformedParameter => "malformed parameter",
+            Rule::IncompleteAttestation => "incomplete attestation contract",
+            Rule::EmptyComputation => "empty computation",
         }
     }
 
@@ -136,7 +155,9 @@ impl Rule {
             | Rule::DanglingIndexEntry
             | Rule::UnknownOkfVersion
             | Rule::LogOutOfOrder
-            | Rule::DanglingLogEntry => Severity::Report,
+            | Rule::DanglingLogEntry
+            | Rule::MalformedParameter
+            | Rule::IncompleteAttestation => Severity::Report,
             Rule::NotAConcept
             | Rule::MissingType
             | Rule::DuplicateId
@@ -147,7 +168,8 @@ impl Rule {
             | Rule::MissingRuntime
             | Rule::InvalidComputationSource
             | Rule::IndexFrontmatter
-            | Rule::NonIsoLogDate => Severity::Defect,
+            | Rule::NonIsoLogDate
+            | Rule::EmptyComputation => Severity::Defect,
         }
     }
 }
@@ -197,7 +219,7 @@ impl fmt::Display for Finding {
 mod tests {
     use super::*;
 
-    const ALL: [Rule; 18] = [
+    const ALL: [Rule; 21] = [
         Rule::NotAConcept,
         Rule::MissingType,
         Rule::DuplicateId,
@@ -216,6 +238,9 @@ mod tests {
         Rule::NonIsoLogDate,
         Rule::LogOutOfOrder,
         Rule::DanglingLogEntry,
+        Rule::MalformedParameter,
+        Rule::IncompleteAttestation,
+        Rule::EmptyComputation,
     ];
 
     #[test]
@@ -236,6 +261,8 @@ mod tests {
         assert_eq!(Rule::UnknownOkfVersion.severity(), Severity::Report);
         assert_eq!(Rule::LogOutOfOrder.severity(), Severity::Report);
         assert_eq!(Rule::DanglingLogEntry.severity(), Severity::Report);
+        assert_eq!(Rule::MalformedParameter.severity(), Severity::Report);
+        assert_eq!(Rule::IncompleteAttestation.severity(), Severity::Report);
         for rule in [
             Rule::NotAConcept,
             Rule::MissingType,
@@ -248,6 +275,7 @@ mod tests {
             Rule::InvalidComputationSource,
             Rule::IndexFrontmatter,
             Rule::NonIsoLogDate,
+            Rule::EmptyComputation,
         ] {
             assert_eq!(rule.severity(), Severity::Defect, "{rule:?}");
         }

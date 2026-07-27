@@ -401,6 +401,25 @@ fn detects_the_computation_section_fenced_or_indented() {
     assert!(!none.body().has_computation_section());
 }
 
+/// An empty `# Computation` section is detected; one with any content (a fence,
+/// or prose) is not; and a body with no such heading is not.
+#[test]
+fn an_empty_computation_section_is_detected() {
+    let empty =
+        Concept::parse("---\ntype: Attested Computation\n---\n# Computation\n\n# Notes\ntext\n")
+            .expect("parses");
+    assert!(empty.body().has_empty_computation_section());
+
+    let filled = Concept::parse(
+        "---\ntype: Attested Computation\n---\n# Computation\n\n```\nSELECT 1\n```\n",
+    )
+    .expect("parses");
+    assert!(!filled.body().has_empty_computation_section());
+
+    let none = Concept::parse("---\ntype: Reference\n---\n# Schema\n").expect("parses");
+    assert!(!none.body().has_empty_computation_section());
+}
+
 /// A CRLF file splits like any other: the fences tolerate the carriage return.
 #[test]
 fn crlf_line_endings_split_the_same_way() {

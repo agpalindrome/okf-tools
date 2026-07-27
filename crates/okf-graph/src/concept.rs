@@ -250,6 +250,20 @@ impl Frontmatter {
         self.fields.contains_key(key)
     }
 
+    /// Whether a declared `executor.receipt` is present but not a list of
+    /// strings (§10.2). Absent is fine — `receipt` is optional; this only flags
+    /// a present-but-wrong-shape value, which `executor()` cannot tell from
+    /// absent (both read as an empty `Vec`).
+    pub(crate) fn executor_receipt_malformed(&self) -> bool {
+        let Some(receipt) = self.fields.get("executor").and_then(|e| e.get("receipt")) else {
+            return false;
+        };
+        match receipt {
+            Value::Sequence(items) => !items.iter().all(|i| matches!(i, Value::String(_))),
+            _ => true,
+        }
+    }
+
     /// The string at `key`, if the block holds a string there.
     fn string(&self, key: &str) -> Option<&str> {
         match self.fields.get(key) {
@@ -446,6 +460,45 @@ impl Body {
             }
         }
         false
+    }
+
+    /// Whether a `# Computation` heading is present but its section is empty —
+    /// no non-blank line before the next heading or the end of the body.
+    ///
+    /// "Empty" is measured as *content presence*, not "has a code block", so it
+    /// does not depend on the §10.3 fenced-vs-indented ambiguity
+    /// (`docs/okf-friction.md`): any content — a fence, indented code, or prose
+    /// — counts as delivered. `false` when there is no `# Computation` heading.
+    pub fn has_empty_computation_section(&self) -> bool {
+        let mut lines = self.0.lines();
+        let mut in_fence = false;
+        let found = lines.by_ref().any(|line| {
+            let trimmed = line.trim_start();
+            if trimmed.starts_with("```") || trimmed.starts_with("~~~") {
+                in_fence = !in_fence;
+                false
+            } else {
+                !in_fence
+                    && trimmed.starts_with('#')
+                    && trimmed.trim_start_matches('#').trim() == "Computation"
+            }
+        });
+        if !found {
+            return false;
+        }
+        for line in lines {
+            let trimmed = line.trim_start();
+            if trimmed.starts_with("```") || trimmed.starts_with("~~~") {
+                return false; // a code block is content
+            }
+            if trimmed.starts_with('#') {
+                return true; // the next heading, with no content between
+            }
+            if !trimmed.is_empty() {
+                return false; // any prose or indented content
+            }
+        }
+        true // end of body with no content
     }
 }
 
