@@ -13,6 +13,7 @@ use std::path::Path;
 
 use crate::links::{links_in, Link, LinkKind};
 use crate::paths::{classify_path, resolve_path, PathKind};
+use crate::provenance::{self, Derivation};
 use crate::{Concept, Finding, Rule};
 
 /// A resolved body-link edge: the linking concept points at another concept in
@@ -33,6 +34,7 @@ pub struct Bundle {
     concepts: BTreeMap<String, Concept>,
     files: BTreeSet<String>,
     links: Vec<BodyLink>,
+    derivations: Vec<Derivation>,
     findings: Vec<Finding>,
 }
 
@@ -48,6 +50,7 @@ impl Bundle {
         collect(root, root, &mut bundle)?;
         bundle.resolve_links();
         bundle.resolve_paths();
+        bundle.resolve_provenance();
         Ok(bundle)
     }
 
@@ -65,6 +68,18 @@ impl Bundle {
     /// linking concept, then document order within a body.
     pub fn links(&self) -> &[BodyLink] {
         &self.links
+    }
+
+    /// Every derivation edge (§5.1): a `sources[].resource` that resolves to a
+    /// concept, so `from` derives from `to`.
+    pub fn derivations(&self) -> &[Derivation] {
+        &self.derivations
+    }
+
+    /// The concepts `id` transitively derives from — the credibility
+    /// propagation walk (§5.1), sorted, deduplicated, and cycle-safe.
+    pub fn derivation_ancestors(&self, id: &str) -> Vec<&str> {
+        provenance::ancestors(&self.derivations, id)
     }
 
     /// The parent of a concept in the directory hierarchy (§3): the nearest
@@ -195,6 +210,41 @@ impl Bundle {
             }
         }
         self.findings.extend(findings);
+    }
+
+    /// Build the derivation graph (§5.1): a `sources[].resource` that resolves
+    /// to a concept is an edge from the deriving concept to its source. A
+    /// source that is a URL, a scope descriptor, or a non-concept file is a
+    /// leaf, not an edge.
+    fn resolve_provenance(&mut self) {
+        let mut edges = Vec::new();
+        for (from, concept) in &self.concepts {
+            for source in concept.frontmatter().sources() {
+                if let Some(resource) = source.resource.as_deref() {
+                    if let Some(to) = self.derivation_target(from, resource) {
+                        edges.push(Derivation {
+                            from: from.clone(),
+                            to,
+                        });
+                    }
+                }
+            }
+        }
+        self.derivations = edges;
+    }
+
+    /// The Concept ID a `sources[].resource` derives from, or `None` when it is
+    /// not a concept: a URL or scope descriptor (both left alone here), or a
+    /// path to a non-`.md` file (an external leaf mirrored under `references/`).
+    fn derivation_target(&self, from: &str, resource: &str) -> Option<String> {
+        match classify_path(resource, true) {
+            PathKind::BundlePath | PathKind::Relative => {
+                let path = resolve_path(from, resource);
+                let id = path.strip_suffix(".md")?;
+                self.concepts.contains_key(id).then(|| id.to_string())
+            }
+            PathKind::Url | PathKind::ScopeDescriptor => None,
+        }
     }
 }
 

@@ -30,6 +30,7 @@ mod concept;
 mod finding;
 mod links;
 mod paths;
+mod provenance;
 
 pub use bundle::Bundle;
 pub use concept::{
@@ -39,3 +40,4 @@ pub use concept::{
 pub use finding::{Finding, Rule, Severity};
 pub use links::{links_in, Link, LinkKind};
 pub use paths::{classify_path, resolve_path, PathKind};
+pub use provenance::Derivation;

@@ -228,6 +228,24 @@ fn a_dangling_path_valued_field_is_a_report() {
         .all(|f| f.severity() == Severity::Report));
 }
 
+/// A `sources[].resource` that resolves to a concept is a derivation edge; the
+/// ancestor walk follows the chain, and a URL source is a leaf (no edge).
+#[test]
+fn a_derivation_chain_builds_edges_and_propagates() {
+    let bundle = Bundle::load(&fixture("derivation")).expect("loads");
+
+    let edges: Vec<(&str, &str)> = bundle
+        .derivations()
+        .iter()
+        .map(|d| (d.from.as_str(), d.to.as_str()))
+        .collect();
+    assert_eq!(edges, [("metric", "revenue"), ("revenue", "policy")]);
+
+    assert_eq!(bundle.derivation_ancestors("metric"), ["policy", "revenue"]);
+    assert_eq!(bundle.derivation_ancestors("policy"), Vec::<&str>::new());
+    assert!(bundle.findings().is_empty());
+}
+
 /// A concept's parent is the nearest path ancestor that is itself a concept;
 /// a directory-only scope (no concept file) contributes none.
 #[test]
