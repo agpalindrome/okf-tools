@@ -29,6 +29,7 @@ mod bundle;
 mod concept;
 mod finding;
 mod links;
+mod paths;
 
 pub use bundle::Bundle;
 pub use concept::{
@@ -37,3 +38,4 @@ pub use concept::{
 };
 pub use finding::{Finding, Rule, Severity};
 pub use links::{links_in, Link, LinkKind};
+pub use paths::{classify_path, resolve_path, PathKind};

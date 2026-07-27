@@ -200,6 +200,34 @@ fn an_attested_computation_with_neither_source_is_reported() {
     assert_eq!(bundle.findings()[0].rule, Rule::InvalidComputationSource);
 }
 
+/// Path-valued fields that resolve — a `references/` file, a `/`-rooted concept
+/// path — report nothing, and a URL and a scope-descriptor source are left
+/// alone (not mistaken for dangling paths).
+#[test]
+fn resolving_path_valued_fields_report_nothing() {
+    let bundle = Bundle::load(&fixture("paths")).expect("loads");
+    assert!(
+        bundle.findings().is_empty(),
+        "expected no findings, got: {:?}",
+        bundle.findings()
+    );
+}
+
+/// A path-valued field naming a file that is not in the bundle is a BUNDLE-3
+/// report — tolerated, never a defect (§6/§11).
+#[test]
+fn a_dangling_path_valued_field_is_a_report() {
+    let bundle = Bundle::load(&fixture("dangling-path")).expect("loads");
+
+    assert_eq!(bundle.findings().len(), 1);
+    assert_eq!(bundle.findings()[0].rule, Rule::DanglingPath);
+    assert_eq!(bundle.findings()[0].file, "revenue.md");
+    assert!(bundle
+        .findings()
+        .iter()
+        .all(|f| f.severity() == Severity::Report));
+}
+
 /// A concept's parent is the nearest path ancestor that is itself a concept;
 /// a directory-only scope (no concept file) contributes none.
 #[test]
