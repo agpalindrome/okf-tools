@@ -518,6 +518,67 @@ fn check_concept(file: &str, concept: &Concept) -> Vec<Finding> {
             };
             findings.push(Finding::new(file, Rule::InvalidComputationSource, detail));
         }
+
+        // CONCEPT-9: each declared parameter needs name, type, and a boolean
+        // `required` (§10.2). A report — parameters are a supporting field.
+        for (i, param) in fm.parameters().iter().enumerate() {
+            let mut missing = Vec::new();
+            if param.name.is_none() {
+                missing.push("name");
+            }
+            if param.kind.is_none() {
+                missing.push("type");
+            }
+            if param.required.is_none() {
+                missing.push("a boolean `required`");
+            }
+            if !missing.is_empty() {
+                findings.push(Finding::new(
+                    file,
+                    Rule::MalformedParameter,
+                    format!(
+                        "`parameters[{i}]` is missing {} (SPEC §10.2)",
+                        missing.join(", ")
+                    ),
+                ));
+            }
+        }
+
+        // CONCEPT-10: a declared executor / attester needs a `resource`, and an
+        // executor's `receipt` must be a list (§10.2). Reports.
+        if let Some(executor) = fm.executor() {
+            if executor
+                .resource
+                .as_deref()
+                .is_none_or(|r| r.trim().is_empty())
+            {
+                findings.push(Finding::new(
+                    file,
+                    Rule::IncompleteAttestation,
+                    "`executor` declares no `resource` (SPEC §10.2)",
+                ));
+            }
+        }
+        if fm.executor_receipt_malformed() {
+            findings.push(Finding::new(
+                file,
+                Rule::IncompleteAttestation,
+                "`executor.receipt` is not a list of field names (SPEC §10.2)",
+            ));
+        }
+        if let Some(attester) = fm.attester() {
+            if attester
+                .resource
+                .as_deref()
+                .is_none_or(|r| r.trim().is_empty())
+            {
+                findings.push(Finding::new(
+                    file,
+                    Rule::IncompleteAttestation,
+                    "`attester` declares no `resource` (SPEC §10.2)",
+                ));
+            }
+        }
     }
 
     findings

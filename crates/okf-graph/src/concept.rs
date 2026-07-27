@@ -250,6 +250,20 @@ impl Frontmatter {
         self.fields.contains_key(key)
     }
 
+    /// Whether a declared `executor.receipt` is present but not a list of
+    /// strings (§10.2). Absent is fine — `receipt` is optional; this only flags
+    /// a present-but-wrong-shape value, which `executor()` cannot tell from
+    /// absent (both read as an empty `Vec`).
+    pub(crate) fn executor_receipt_malformed(&self) -> bool {
+        let Some(receipt) = self.fields.get("executor").and_then(|e| e.get("receipt")) else {
+            return false;
+        };
+        match receipt {
+            Value::Sequence(items) => !items.iter().all(|i| matches!(i, Value::String(_))),
+            _ => true,
+        }
+    }
+
     /// The string at `key`, if the block holds a string there.
     fn string(&self, key: &str) -> Option<&str> {
         match self.fields.get(key) {
