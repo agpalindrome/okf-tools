@@ -50,6 +50,12 @@ impl Bundle {
     /// file that is not a well-formed concept does not — it becomes a finding,
     /// so one malformed document never blocks the rest of the bundle.
     pub fn load(root: &Path) -> std::io::Result<Bundle> {
+        if !root.is_dir() {
+            return Err(std::io::Error::other(format!(
+                "bundle path is not a directory: {}",
+                root.display()
+            )));
+        }
         let mut bundle = Bundle::default();
         collect(root, root, &mut bundle)?;
         bundle.resolve_links();
