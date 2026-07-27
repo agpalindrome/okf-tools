@@ -53,6 +53,10 @@ pub enum Rule {
     /// BUNDLE-3: a path-valued field (§6.2) names a bundle file that is not
     /// there. A report, not a defect — §6/§11 tolerate a broken reference.
     DanglingPath,
+    /// BUNDLE-4: the derivation edges (§5.1) form a cycle. A report — §11 is
+    /// silent on acyclicity, and telling a benign loop from a genuine
+    /// contradiction is deferred (#62).
+    DerivationCycle,
 }
 
 impl Rule {
@@ -70,6 +74,7 @@ impl Rule {
             Rule::MissingRuntime => "CONCEPT-7",
             Rule::InvalidComputationSource => "CONCEPT-8",
             Rule::DanglingPath => "BUNDLE-3",
+            Rule::DerivationCycle => "BUNDLE-4",
         }
     }
 
@@ -87,13 +92,14 @@ impl Rule {
             Rule::MissingRuntime => "missing runtime",
             Rule::InvalidComputationSource => "invalid computation source",
             Rule::DanglingPath => "dangling path",
+            Rule::DerivationCycle => "derivation cycle",
         }
     }
 
     /// Whether this rule is a defect or a tolerated report.
     pub fn severity(self) -> Severity {
         match self {
-            Rule::DanglingLink | Rule::DanglingPath => Severity::Report,
+            Rule::DanglingLink | Rule::DanglingPath | Rule::DerivationCycle => Severity::Report,
             Rule::NotAConcept
             | Rule::MissingType
             | Rule::DuplicateId
@@ -152,7 +158,7 @@ impl fmt::Display for Finding {
 mod tests {
     use super::*;
 
-    const ALL: [Rule; 11] = [
+    const ALL: [Rule; 12] = [
         Rule::NotAConcept,
         Rule::MissingType,
         Rule::DuplicateId,
@@ -164,6 +170,7 @@ mod tests {
         Rule::MissingRuntime,
         Rule::InvalidComputationSource,
         Rule::DanglingPath,
+        Rule::DerivationCycle,
     ];
 
     #[test]
@@ -179,6 +186,7 @@ mod tests {
     fn severity_splits_the_tolerated_report_from_the_defects() {
         assert_eq!(Rule::DanglingLink.severity(), Severity::Report);
         assert_eq!(Rule::DanglingPath.severity(), Severity::Report);
+        assert_eq!(Rule::DerivationCycle.severity(), Severity::Report);
         for rule in [
             Rule::NotAConcept,
             Rule::MissingType,

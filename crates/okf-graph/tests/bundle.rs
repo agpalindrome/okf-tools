@@ -228,6 +228,42 @@ fn a_dangling_path_valued_field_is_a_report() {
         .all(|f| f.severity() == Severity::Report));
 }
 
+/// A `sources[].resource` that resolves to a concept is a derivation edge; the
+/// ancestor walk follows the chain, and a URL source is a leaf (no edge).
+#[test]
+fn a_derivation_chain_builds_edges_and_propagates() {
+    let bundle = Bundle::load(&fixture("derivation")).expect("loads");
+
+    let edges: Vec<(&str, &str)> = bundle
+        .derivations()
+        .iter()
+        .map(|d| (d.from.as_str(), d.to.as_str()))
+        .collect();
+    assert_eq!(edges, [("metric", "revenue"), ("revenue", "policy")]);
+
+    assert_eq!(bundle.derivation_ancestors("metric"), ["policy", "revenue"]);
+    assert_eq!(bundle.derivation_ancestors("policy"), Vec::<&str>::new());
+    assert!(bundle.findings().is_empty());
+}
+
+/// Two concepts that derive from each other form a cycle — surfaced as
+/// BUNDLE-4, a report (§11 is silent on acyclicity, so it does not fail a run).
+#[test]
+fn a_derivation_cycle_is_reported() {
+    let bundle = Bundle::load(&fixture("derivation-cycle")).expect("loads");
+
+    assert_eq!(bundle.findings().len(), 1);
+    let cycle = &bundle.findings()[0];
+    assert_eq!(cycle.rule, Rule::DerivationCycle);
+    assert_eq!(cycle.severity(), Severity::Report);
+    assert_eq!(cycle.file, "a.md");
+    assert!(
+        cycle.detail.contains("a → b → a"),
+        "detail: {}",
+        cycle.detail
+    );
+}
+
 /// A concept's parent is the nearest path ancestor that is itself a concept;
 /// a directory-only scope (no concept file) contributes none.
 #[test]
