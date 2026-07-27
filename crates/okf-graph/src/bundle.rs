@@ -11,6 +11,8 @@ use std::collections::btree_map::{BTreeMap, Entry};
 use std::collections::BTreeSet;
 use std::path::Path;
 
+use crate::concept::split_frontmatter;
+use crate::index;
 use crate::links::{links_in, Link, LinkKind};
 use crate::paths::{classify_path, resolve_path, PathKind};
 use crate::provenance::{self, Derivation};
@@ -33,6 +35,7 @@ pub struct BodyLink {
 pub struct Bundle {
     concepts: BTreeMap<String, Concept>,
     files: BTreeSet<String>,
+    reserved: Vec<(String, String)>,
     links: Vec<BodyLink>,
     derivations: Vec<Derivation>,
     findings: Vec<Finding>,
@@ -51,6 +54,7 @@ impl Bundle {
         bundle.resolve_links();
         bundle.resolve_paths();
         bundle.resolve_provenance();
+        bundle.resolve_reserved();
         Ok(bundle)
     }
 
@@ -246,6 +250,73 @@ impl Bundle {
         self.derivations = edges;
     }
 
+    /// Check each reserved file's own structure (§8/§9), now that the whole
+    /// tree is known so an entry can be resolved against it.
+    fn resolve_reserved(&mut self) {
+        let reserved = std::mem::take(&mut self.reserved);
+        let mut findings = Vec::new();
+        for (path, text) in &reserved {
+            if reserved_name(path) == "index.md" {
+                self.check_index(path, text, &mut findings);
+            }
+        }
+        self.findings.extend(findings);
+    }
+
+    /// Check one `index.md` (§8/§12): its frontmatter rule, a declared
+    /// `okf_version`, and that each entry link resolves.
+    fn check_index(&self, path: &str, text: &str, findings: &mut Vec<Finding>) {
+        let (frontmatter, body) = split_frontmatter(text);
+        let is_root = !path.contains('/');
+        if let Some(frontmatter) = frontmatter {
+            let check = index::check_frontmatter(frontmatter, is_root);
+            if !check.illegal_keys.is_empty() {
+                let keys = check.illegal_keys.join(", ");
+                let detail = if is_root {
+                    format!("root index.md may carry only `okf_version`; found: {keys}")
+                } else {
+                    format!("a nested index.md may carry no frontmatter; found: {keys}")
+                };
+                findings.push(Finding::new(path, Rule::IndexFrontmatter, detail));
+            }
+            if let Some(version) = check.unknown_version {
+                findings.push(Finding::new(
+                    path,
+                    Rule::UnknownOkfVersion,
+                    format!("okf_version `{version}` is not understood; this tool reads 0.1 and 0.2 (SPEC §12)"),
+                ));
+            }
+        }
+
+        let from = strip_md(path);
+        for link in links_in(body) {
+            let target = match link.kind {
+                LinkKind::BundleAbsolute | LinkKind::Relative => resolve_path(&from, &link.target),
+                LinkKind::External | LinkKind::Fragment => continue,
+            };
+            if !self.entry_resolves(&target) {
+                findings.push(Finding::new(
+                    path,
+                    Rule::DanglingIndexEntry,
+                    format!(
+                        "index entry `{}` resolves to no concept, file, or directory",
+                        link.target
+                    ),
+                ));
+            }
+        }
+    }
+
+    /// Whether a resolved entry target names a file in the bundle or a directory
+    /// that holds one (an index may list a subdirectory, §8).
+    fn entry_resolves(&self, target: &str) -> bool {
+        self.files.contains(target)
+            || self.files.iter().any(|f| {
+                f.strip_prefix(target)
+                    .is_some_and(|rest| rest.starts_with('/'))
+            })
+    }
+
     /// The Concept ID a `sources[].resource` derives from, or `None` when it is
     /// not a concept: a URL or scope descriptor (both left alone here), or a
     /// path to a non-`.md` file (an external leaf mirrored under `references/`).
@@ -281,7 +352,11 @@ fn collect(root: &Path, path: &Path, out: &mut Bundle) -> std::io::Result<()> {
         // are targets too (`references/foo.py`, `/log.md`).
         let file = rel_path(root, path);
         out.files.insert(file.clone());
-        if is_markdown(path) && !is_reserved(path) {
+        if is_reserved(path) {
+            // A reserved file is not a concept; its own structure (§8/§9) is
+            // checked once the whole tree is known, so keep its text for then.
+            out.reserved.push((file, std::fs::read_to_string(path)?));
+        } else if is_markdown(path) {
             let text = std::fs::read_to_string(path)?;
             match Concept::parse(&text) {
                 Ok(concept) => {
@@ -443,6 +518,11 @@ fn is_reserved(path: &Path) -> bool {
         path.file_name().and_then(|n| n.to_str()),
         Some("index.md" | "log.md")
     )
+}
+
+/// The final path segment of a bundle-relative path — the reserved file's name.
+fn reserved_name(path: &str) -> &str {
+    path.rsplit('/').next().unwrap_or(path)
 }
 
 /// A file's path relative to the bundle root, `/`-joined — the locator a

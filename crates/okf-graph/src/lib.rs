@@ -28,6 +28,7 @@
 mod bundle;
 mod concept;
 mod finding;
+mod index;
 mod links;
 mod paths;
 mod provenance;

@@ -512,3 +512,14 @@ fn split(source: &str) -> Result<(&str, &str), ConceptError> {
     }
     Err(ConceptError::UnterminatedFrontmatter)
 }
+
+/// Split a reserved file (an `index.md` / `log.md`) into its optional
+/// frontmatter and its body. Unlike a concept, a reserved file need not carry
+/// frontmatter — so a file with no `---` fence yields `(None, whole text)`
+/// rather than an error, and the body is always available for its own checks.
+pub(crate) fn split_frontmatter(source: &str) -> (Option<&str>, &str) {
+    match split(source) {
+        Ok((frontmatter, body)) => (Some(frontmatter), body),
+        Err(_) => (None, source),
+    }
+}

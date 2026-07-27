@@ -57,6 +57,16 @@ pub enum Rule {
     /// silent on acyclicity, and telling a benign loop from a genuine
     /// contradiction is deferred (#62).
     DerivationCycle,
+    /// INDEX-1: an `index.md` carries frontmatter it may not — any in a nested
+    /// index, or a key other than `okf_version` at the root (§8/§12). A defect:
+    /// §11 requires reserved files to follow §8's structure.
+    IndexFrontmatter,
+    /// INDEX-2: an `index.md` entry link resolves to no concept, file, or
+    /// subdirectory (§8). A report — a broken link is tolerated (§6).
+    DanglingIndexEntry,
+    /// INDEX-3: a root `index.md` declares an `okf_version` this tool does not
+    /// understand (§12). A report — §12 says best-effort, do not refuse.
+    UnknownOkfVersion,
 }
 
 impl Rule {
@@ -75,6 +85,9 @@ impl Rule {
             Rule::InvalidComputationSource => "CONCEPT-8",
             Rule::DanglingPath => "BUNDLE-3",
             Rule::DerivationCycle => "BUNDLE-4",
+            Rule::IndexFrontmatter => "INDEX-1",
+            Rule::DanglingIndexEntry => "INDEX-2",
+            Rule::UnknownOkfVersion => "INDEX-3",
         }
     }
 
@@ -93,13 +106,20 @@ impl Rule {
             Rule::InvalidComputationSource => "invalid computation source",
             Rule::DanglingPath => "dangling path",
             Rule::DerivationCycle => "derivation cycle",
+            Rule::IndexFrontmatter => "index frontmatter not allowed",
+            Rule::DanglingIndexEntry => "dangling index entry",
+            Rule::UnknownOkfVersion => "unknown okf_version",
         }
     }
 
     /// Whether this rule is a defect or a tolerated report.
     pub fn severity(self) -> Severity {
         match self {
-            Rule::DanglingLink | Rule::DanglingPath | Rule::DerivationCycle => Severity::Report,
+            Rule::DanglingLink
+            | Rule::DanglingPath
+            | Rule::DerivationCycle
+            | Rule::DanglingIndexEntry
+            | Rule::UnknownOkfVersion => Severity::Report,
             Rule::NotAConcept
             | Rule::MissingType
             | Rule::DuplicateId
@@ -108,7 +128,8 @@ impl Rule {
             | Rule::MalformedActor
             | Rule::MissingSourceResource
             | Rule::MissingRuntime
-            | Rule::InvalidComputationSource => Severity::Defect,
+            | Rule::InvalidComputationSource
+            | Rule::IndexFrontmatter => Severity::Defect,
         }
     }
 }
@@ -158,7 +179,7 @@ impl fmt::Display for Finding {
 mod tests {
     use super::*;
 
-    const ALL: [Rule; 12] = [
+    const ALL: [Rule; 15] = [
         Rule::NotAConcept,
         Rule::MissingType,
         Rule::DuplicateId,
@@ -171,6 +192,9 @@ mod tests {
         Rule::InvalidComputationSource,
         Rule::DanglingPath,
         Rule::DerivationCycle,
+        Rule::IndexFrontmatter,
+        Rule::DanglingIndexEntry,
+        Rule::UnknownOkfVersion,
     ];
 
     #[test]
@@ -187,6 +211,8 @@ mod tests {
         assert_eq!(Rule::DanglingLink.severity(), Severity::Report);
         assert_eq!(Rule::DanglingPath.severity(), Severity::Report);
         assert_eq!(Rule::DerivationCycle.severity(), Severity::Report);
+        assert_eq!(Rule::DanglingIndexEntry.severity(), Severity::Report);
+        assert_eq!(Rule::UnknownOkfVersion.severity(), Severity::Report);
         for rule in [
             Rule::NotAConcept,
             Rule::MissingType,
@@ -197,6 +223,7 @@ mod tests {
             Rule::MissingSourceResource,
             Rule::MissingRuntime,
             Rule::InvalidComputationSource,
+            Rule::IndexFrontmatter,
         ] {
             assert_eq!(rule.severity(), Severity::Defect, "{rule:?}");
         }
