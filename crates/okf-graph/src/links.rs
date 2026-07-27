@@ -1,17 +1,18 @@
 //! Extracting and classifying the markdown links in a concept body (§6.1).
 //!
-//! Handles **inline** `[text](target)` links (including the `(target "title")`
-//! and `(<target>)` forms), skips fenced code blocks, and ignores links inside
-//! an inline code span (`` `[x](y)` `` is code, not a link). A code span that
-//! runs across lines (rare; fenced blocks are handled separately) is the one
-//! residual — masking is per line.
-//!
-//! Reference-style links (`[text][ref]` + `[ref]: …`) are not handled yet, and
-//! are documented rather than dropped silently — a missed link is a missed
-//! dangling edge, which is exactly the bug this crate exists to catch (#54).
+//! Handles inline `[text](target)` links (including the `(target "title")` and
+//! `(<target>)` forms) and reference-style links — full `[text][ref]`, collapsed
+//! `[text][]`, and shortcut `[ref]` — resolved through their `[ref]: target`
+//! definitions. Fenced code blocks are skipped, and inline code spans are masked
+//! (`` `[x](y)` `` is code, not a link). A code span that runs across lines
+//! (rare; fenced blocks are handled separately) is the one residual, as masking
+//! is per line; and link text with nested brackets (`[a [b]](x)`) matches on the
+//! first `]`.
 //!
 //! Resolution to a Concept ID is a separate step (it needs the whole bundle);
 //! this module only reads a body and says what each link *is*.
+
+use std::collections::BTreeMap;
 
 /// A markdown link found in a concept body, with its target as written (the
 /// `#fragment`, if any, is kept — stripping it belongs to resolution).
@@ -37,8 +38,11 @@ pub enum LinkKind {
     Fragment,
 }
 
-/// Every inline link in a body, in document order, skipping fenced code blocks.
+/// Every link in a body, in document order. Two passes: collect the
+/// `[ref]: target` definitions, then scan for links (inline and reference),
+/// skipping fenced code blocks and the definition lines themselves.
 pub fn links_in(body: &str) -> Vec<Link> {
+    let definitions = collect_definitions(body);
     let mut links = Vec::new();
     let mut in_fence = false;
     for line in body.lines() {
@@ -47,35 +51,122 @@ pub fn links_in(body: &str) -> Vec<Link> {
             in_fence = !in_fence;
             continue;
         }
-        if !in_fence {
-            extract_line(line, &mut links);
+        if in_fence || is_definition(trimmed) {
+            continue;
         }
+        extract_line(line, &definitions, &mut links);
     }
     links
 }
 
-/// Scan one line for `[text](target)` links, pushing each target found. The
-/// `](` marker is the anchor; the link text before it is not needed here.
-/// Inline code spans are masked first, so a `` `[x](y)` `` inside code is not
-/// mistaken for a link.
-fn extract_line(line: &str, out: &mut Vec<Link>) {
+/// Scan one line, pushing each link's target: inline `[text](target)`, and
+/// reference `[text][ref]` / `[text][]` / `[ref]` resolved through
+/// `definitions`. Inline code spans are masked first, so a `` `[x](y)` `` inside
+/// code is not mistaken for a link. Link text matches on the first `]`.
+fn extract_line(line: &str, definitions: &BTreeMap<String, String>, out: &mut Vec<Link>) {
     let masked = mask_code_spans(line);
     let mut rest = masked.as_str();
-    while let Some(pos) = rest.find("](") {
-        let after = &rest[pos + 2..];
-        match parse_target(after) {
-            Some((target, consumed)) => {
-                if !target.is_empty() {
-                    out.push(Link {
-                        kind: classify(&target),
-                        target,
-                    });
+    while let Some(open) = rest.find('[') {
+        let after_open = &rest[open + 1..];
+        let Some(close) = after_open.find(']') else {
+            break;
+        };
+        let text = &after_open[..close];
+        let tail = &after_open[close + 1..];
+
+        if let Some(inline) = tail.strip_prefix('(') {
+            // inline: [text](target)
+            match parse_target(inline) {
+                Some((target, consumed)) => {
+                    push_target(&target, out);
+                    rest = &inline[consumed..];
                 }
-                rest = &after[consumed..];
+                None => rest = tail,
             }
-            None => rest = after,
+        } else if let Some(reference) = tail.strip_prefix('[') {
+            // full [text][ref] or collapsed [text][]
+            match reference.find(']') {
+                Some(ref_close) => {
+                    let label = &reference[..ref_close];
+                    let key = if label.is_empty() { text } else { label };
+                    resolve_reference(key, definitions, out);
+                    rest = &reference[ref_close + 1..];
+                }
+                None => rest = tail,
+            }
+        } else {
+            // shortcut [ref]
+            resolve_reference(text, definitions, out);
+            rest = tail;
         }
     }
+}
+
+/// Push a link for `target` unless it is empty.
+fn push_target(target: &str, out: &mut Vec<Link>) {
+    if !target.is_empty() {
+        out.push(Link {
+            kind: classify(target),
+            target: target.to_string(),
+        });
+    }
+}
+
+/// Push a link for a reference `label`, if a definition resolves it. An
+/// undefined label is plain text, not a link.
+fn resolve_reference(label: &str, definitions: &BTreeMap<String, String>, out: &mut Vec<Link>) {
+    if let Some(target) = definitions.get(&label.to_lowercase()) {
+        push_target(target, out);
+    }
+}
+
+/// Collect the `[label]: target` reference definitions, keyed by lowercased
+/// label (the first definition of a label wins). Fenced code blocks and
+/// footnote definitions (`[^id]: …`, §5.1) are skipped.
+fn collect_definitions(body: &str) -> BTreeMap<String, String> {
+    let mut definitions = BTreeMap::new();
+    let mut in_fence = false;
+    for line in body.lines() {
+        let trimmed = line.trim_start();
+        if trimmed.starts_with("```") || trimmed.starts_with("~~~") {
+            in_fence = !in_fence;
+            continue;
+        }
+        if in_fence {
+            continue;
+        }
+        if let Some((label, target)) = parse_definition(trimmed) {
+            definitions.entry(label).or_insert(target);
+        }
+    }
+    definitions
+}
+
+/// A `[label]: target` definition — its lowercased label and target (a leading
+/// `<…>` unwrapped, a trailing title dropped). `None` when the line is not a
+/// definition, or is a footnote definition (`[^id]:`).
+fn parse_definition(line: &str) -> Option<(String, String)> {
+    let rest = line.strip_prefix('[')?;
+    let close = rest.find("]:")?;
+    let label = &rest[..close];
+    if label.is_empty() || label.starts_with('^') {
+        return None;
+    }
+    let after = rest[close + 2..].trim();
+    let target = after.split_whitespace().next()?;
+    let target = target
+        .strip_prefix('<')
+        .and_then(|t| t.strip_suffix('>'))
+        .unwrap_or(target);
+    if target.is_empty() {
+        return None;
+    }
+    Some((label.to_lowercase(), target.to_string()))
+}
+
+/// Whether a start-trimmed line is a reference definition.
+fn is_definition(line: &str) -> bool {
+    parse_definition(line).is_some()
 }
 
 /// Blank out inline code spans — a run of N backticks opens a span the next run
@@ -225,6 +316,34 @@ not a [link](/nope.md)
 ```
 after [also-real](/b.md)";
         assert_eq!(targets(body), ["/a.md", "/b.md"]);
+    }
+
+    #[test]
+    fn resolves_the_reference_link_forms() {
+        let body = "\
+The [full form][ga4], the [ga4][] collapsed, and the [ga4] shortcut.
+
+[ga4]: /tables/ga4.md
+";
+        // all three forms resolve to the definition's target, and classify it.
+        let links = links_in(body);
+        assert!(links.iter().all(|l| l.target == "/tables/ga4.md"));
+        assert!(links.iter().all(|l| l.kind == LinkKind::BundleAbsolute));
+        assert_eq!(links.len(), 3);
+    }
+
+    #[test]
+    fn an_undefined_reference_and_a_footnote_are_not_links() {
+        // `[missing]` has no definition; `[^note]` is a footnote (§5.1), and its
+        // definition line is not a link definition.
+        let body = "See [missing][nope] and a claim.[^note]\n\n[^note]: the source\n";
+        assert!(targets(body).is_empty());
+    }
+
+    #[test]
+    fn a_definition_line_is_not_scanned_as_a_link() {
+        // the def line must not read as a shortcut use of its own label.
+        assert!(targets("[o]: /b.md\n").is_empty());
     }
 
     #[test]
