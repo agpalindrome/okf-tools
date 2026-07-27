@@ -230,6 +230,19 @@ impl Bundle {
                 }
             }
         }
+        for cycle in provenance::cycles(&edges) {
+            let loop_path = cycle
+                .iter()
+                .chain(std::iter::once(&cycle[0]))
+                .cloned()
+                .collect::<Vec<_>>()
+                .join(" → ");
+            self.findings.push(Finding::new(
+                format!("{}.md", cycle[0]),
+                Rule::DerivationCycle,
+                format!("derivation cycle: {loop_path}"),
+            ));
+        }
         self.derivations = edges;
     }
 

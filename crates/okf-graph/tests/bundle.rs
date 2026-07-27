@@ -246,6 +246,24 @@ fn a_derivation_chain_builds_edges_and_propagates() {
     assert!(bundle.findings().is_empty());
 }
 
+/// Two concepts that derive from each other form a cycle — surfaced as
+/// BUNDLE-4, a report (§11 is silent on acyclicity, so it does not fail a run).
+#[test]
+fn a_derivation_cycle_is_reported() {
+    let bundle = Bundle::load(&fixture("derivation-cycle")).expect("loads");
+
+    assert_eq!(bundle.findings().len(), 1);
+    let cycle = &bundle.findings()[0];
+    assert_eq!(cycle.rule, Rule::DerivationCycle);
+    assert_eq!(cycle.severity(), Severity::Report);
+    assert_eq!(cycle.file, "a.md");
+    assert!(
+        cycle.detail.contains("a → b → a"),
+        "detail: {}",
+        cycle.detail
+    );
+}
+
 /// A concept's parent is the nearest path ancestor that is itself a concept;
 /// a directory-only scope (no concept file) contributes none.
 #[test]
