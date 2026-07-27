@@ -90,6 +90,28 @@ inferring intent from punctuation?
 **Raised upstream** 2026-07-26 as
 [GoogleCloudPlatform/knowledge-catalog#236][issue-236].
 
+## 2026-07-27 — §9 states "newest first" without marking its normative force
+
+[§9][s9] describes a `log.md` as "a flat list of date-grouped entries, **newest
+first**," then says date headings **MUST** use ISO 8601, and that the bold lead
+word is "a convention, **not a requirement**." Two of the three statements are
+explicitly marked — one a MUST, one a convention — and the ordering ("newest
+first") is marked as neither. So a checker cannot tell whether an out-of-order
+log is non-conformant (§11 requires reserved files follow §9) or merely
+untidy.
+
+**How okf-graph handles it.** A non-ISO date heading is a defect (the explicit
+§9 MUST); an out-of-order log is a **report**, not a defect — surfaced, but not
+failed, since §9 does not mark ordering as required. This follows the standing
+rule of not failing a bundle the spec does not clearly make non-conformant.
+
+**Not raised upstream** (2026-07-27). This is the fourth instance of one
+pattern — the spec stating a constraint without marking its normative force
+(cf. [#234][issue], [#235][issue-235], [#236][issue-236] for actors, the inline
+computation, and scope descriptors). Held to raise as a single pattern
+observation once the working group engages the open issues, rather than filing
+a fourth in silence.
+
 [issue]: https://github.com/GoogleCloudPlatform/knowledge-catalog/issues/234
 [issue-235]: https://github.com/GoogleCloudPlatform/knowledge-catalog/issues/235
 [issue-236]: https://github.com/GoogleCloudPlatform/knowledge-catalog/issues/236
@@ -98,3 +120,4 @@ inferring intent from punctuation?
 [s51]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md#51-provenance-sources
 [s102]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md#102-contract-fields
 [s103]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md#103-the-computation
+[s9]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md#9-log-files

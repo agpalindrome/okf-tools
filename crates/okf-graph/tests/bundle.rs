@@ -264,6 +264,87 @@ fn a_derivation_cycle_is_reported() {
     );
 }
 
+/// A valid index bundle — a root `index.md` with `okf_version` and entries that
+/// resolve (a concept and a subdirectory), plus a nested index — reports
+/// nothing.
+#[test]
+fn a_valid_index_reports_nothing() {
+    let bundle = Bundle::load(&fixture("index-valid")).expect("loads");
+    assert!(
+        bundle.findings().is_empty(),
+        "expected no findings, got: {:?}",
+        bundle.findings()
+    );
+}
+
+/// A root `index.md` carrying a key other than `okf_version` is INDEX-1, a
+/// defect (§8/§11); the entry still resolves, so it is the only finding.
+#[test]
+fn an_index_with_illegal_frontmatter_is_a_defect() {
+    let bundle = Bundle::load(&fixture("index-bad-frontmatter")).expect("loads");
+
+    assert_eq!(bundle.findings().len(), 1);
+    assert_eq!(bundle.findings()[0].rule, Rule::IndexFrontmatter);
+    assert_eq!(bundle.findings()[0].severity(), Severity::Defect);
+    assert_eq!(bundle.findings()[0].file, "index.md");
+}
+
+/// An index entry that resolves to nothing is INDEX-2, a report (§6 tolerates a
+/// broken link).
+#[test]
+fn a_dangling_index_entry_is_a_report() {
+    let bundle = Bundle::load(&fixture("index-dangling-entry")).expect("loads");
+
+    assert_eq!(bundle.findings().len(), 1);
+    assert_eq!(bundle.findings()[0].rule, Rule::DanglingIndexEntry);
+    assert_eq!(bundle.findings()[0].severity(), Severity::Report);
+    assert_eq!(bundle.findings()[0].file, "index.md");
+}
+
+/// A well-ordered, ISO-dated log whose entry resolves reports nothing.
+#[test]
+fn a_valid_log_reports_nothing() {
+    let bundle = Bundle::load(&fixture("log-valid")).expect("loads");
+    assert!(
+        bundle.findings().is_empty(),
+        "expected no findings, got: {:?}",
+        bundle.findings()
+    );
+}
+
+/// A non-ISO log date heading is LOG-1, a defect (§9 makes the date a MUST).
+#[test]
+fn a_non_iso_log_date_is_a_defect() {
+    let bundle = Bundle::load(&fixture("log-bad-date")).expect("loads");
+
+    assert_eq!(bundle.findings().len(), 1);
+    assert_eq!(bundle.findings()[0].rule, Rule::NonIsoLogDate);
+    assert_eq!(bundle.findings()[0].severity(), Severity::Defect);
+    assert_eq!(bundle.findings()[0].file, "log.md");
+}
+
+/// Headings not in newest-first order are LOG-2, a report (§9 states the order
+/// but does not mark it a MUST).
+#[test]
+fn an_out_of_order_log_is_a_report() {
+    let bundle = Bundle::load(&fixture("log-out-of-order")).expect("loads");
+
+    assert_eq!(bundle.findings().len(), 1);
+    assert_eq!(bundle.findings()[0].rule, Rule::LogOutOfOrder);
+    assert_eq!(bundle.findings()[0].severity(), Severity::Report);
+}
+
+/// A log entry that resolves to nothing is LOG-3, a report (§6 tolerates it).
+#[test]
+fn a_dangling_log_entry_is_a_report() {
+    let bundle = Bundle::load(&fixture("log-dangling-entry")).expect("loads");
+
+    assert_eq!(bundle.findings().len(), 1);
+    assert_eq!(bundle.findings()[0].rule, Rule::DanglingLogEntry);
+    assert_eq!(bundle.findings()[0].severity(), Severity::Report);
+    assert_eq!(bundle.findings()[0].file, "log.md");
+}
+
 /// A concept's parent is the nearest path ancestor that is itself a concept;
 /// a directory-only scope (no concept file) contributes none.
 #[test]
