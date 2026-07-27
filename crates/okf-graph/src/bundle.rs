@@ -519,6 +519,18 @@ fn check_concept(file: &str, concept: &Concept) -> Vec<Finding> {
             findings.push(Finding::new(file, Rule::InvalidComputationSource, detail));
         }
 
+        // CONCEPT-11: a `# Computation` heading that is the sole source but is
+        // empty delivers no computation (§10.3) — the same defect as CONCEPT-8's
+        // "neither", caught precisely (CONCEPT-8 keys only on heading presence).
+        if !has_path && concept.body().has_empty_computation_section() {
+            findings.push(Finding::new(
+                file,
+                Rule::EmptyComputation,
+                "the `# Computation` section is empty — the inline computation is \
+                 declared but not provided (SPEC §10.3)",
+            ));
+        }
+
         // CONCEPT-9: each declared parameter needs name, type, and a boolean
         // `required` (§10.2). A report — parameters are a supporting field.
         for (i, param) in fm.parameters().iter().enumerate() {

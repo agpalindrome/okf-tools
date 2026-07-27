@@ -461,6 +461,45 @@ impl Body {
         }
         false
     }
+
+    /// Whether a `# Computation` heading is present but its section is empty —
+    /// no non-blank line before the next heading or the end of the body.
+    ///
+    /// "Empty" is measured as *content presence*, not "has a code block", so it
+    /// does not depend on the §10.3 fenced-vs-indented ambiguity
+    /// (`docs/okf-friction.md`): any content — a fence, indented code, or prose
+    /// — counts as delivered. `false` when there is no `# Computation` heading.
+    pub fn has_empty_computation_section(&self) -> bool {
+        let mut lines = self.0.lines();
+        let mut in_fence = false;
+        let found = lines.by_ref().any(|line| {
+            let trimmed = line.trim_start();
+            if trimmed.starts_with("```") || trimmed.starts_with("~~~") {
+                in_fence = !in_fence;
+                false
+            } else {
+                !in_fence
+                    && trimmed.starts_with('#')
+                    && trimmed.trim_start_matches('#').trim() == "Computation"
+            }
+        });
+        if !found {
+            return false;
+        }
+        for line in lines {
+            let trimmed = line.trim_start();
+            if trimmed.starts_with("```") || trimmed.starts_with("~~~") {
+                return false; // a code block is content
+            }
+            if trimmed.starts_with('#') {
+                return true; // the next heading, with no content between
+            }
+            if !trimmed.is_empty() {
+                return false; // any prose or indented content
+            }
+        }
+        true // end of body with no content
+    }
 }
 
 /// The ways a markdown file can fail to *be* a concept document — all about

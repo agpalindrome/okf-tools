@@ -389,6 +389,19 @@ fn an_incomplete_attestation_is_reported() {
     assert_eq!(bundle.findings().len(), 3, "{:?}", bundle.findings());
 }
 
+/// An Attested Computation whose sole source is an empty `# Computation`
+/// section delivers no computation — CONCEPT-11, a defect (the sibling of
+/// CONCEPT-8's "neither").
+#[test]
+fn an_empty_computation_section_is_a_defect() {
+    let bundle = Bundle::load(&fixture("ac-empty-computation")).expect("loads");
+
+    assert_eq!(bundle.findings().len(), 1);
+    assert_eq!(bundle.findings()[0].rule, Rule::EmptyComputation);
+    assert_eq!(bundle.findings()[0].severity(), Severity::Defect);
+    assert_eq!(bundle.findings()[0].file, "thing.md");
+}
+
 /// A concept's parent is the nearest path ancestor that is itself a concept;
 /// a directory-only scope (no concept file) contributes none.
 #[test]
