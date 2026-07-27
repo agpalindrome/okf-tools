@@ -67,6 +67,15 @@ pub enum Rule {
     /// INDEX-3: a root `index.md` declares an `okf_version` this tool does not
     /// understand (§12). A report — §12 says best-effort, do not refuse.
     UnknownOkfVersion,
+    /// LOG-1: a `log.md` date heading is not ISO-8601 `YYYY-MM-DD` (§9). A
+    /// defect: §9 makes the date format an explicit MUST.
+    NonIsoLogDate,
+    /// LOG-2: a `log.md`'s date headings are not in newest-first order (§9). A
+    /// report — §9 states the order but does not mark it a MUST (#47 friction).
+    LogOutOfOrder,
+    /// LOG-3: a `log.md` entry link resolves to no concept, file, or directory
+    /// (§9). A report — a broken link is tolerated (§6).
+    DanglingLogEntry,
 }
 
 impl Rule {
@@ -88,6 +97,9 @@ impl Rule {
             Rule::IndexFrontmatter => "INDEX-1",
             Rule::DanglingIndexEntry => "INDEX-2",
             Rule::UnknownOkfVersion => "INDEX-3",
+            Rule::NonIsoLogDate => "LOG-1",
+            Rule::LogOutOfOrder => "LOG-2",
+            Rule::DanglingLogEntry => "LOG-3",
         }
     }
 
@@ -109,6 +121,9 @@ impl Rule {
             Rule::IndexFrontmatter => "index frontmatter not allowed",
             Rule::DanglingIndexEntry => "dangling index entry",
             Rule::UnknownOkfVersion => "unknown okf_version",
+            Rule::NonIsoLogDate => "non-ISO log date",
+            Rule::LogOutOfOrder => "log out of order",
+            Rule::DanglingLogEntry => "dangling log entry",
         }
     }
 
@@ -119,7 +134,9 @@ impl Rule {
             | Rule::DanglingPath
             | Rule::DerivationCycle
             | Rule::DanglingIndexEntry
-            | Rule::UnknownOkfVersion => Severity::Report,
+            | Rule::UnknownOkfVersion
+            | Rule::LogOutOfOrder
+            | Rule::DanglingLogEntry => Severity::Report,
             Rule::NotAConcept
             | Rule::MissingType
             | Rule::DuplicateId
@@ -129,7 +146,8 @@ impl Rule {
             | Rule::MissingSourceResource
             | Rule::MissingRuntime
             | Rule::InvalidComputationSource
-            | Rule::IndexFrontmatter => Severity::Defect,
+            | Rule::IndexFrontmatter
+            | Rule::NonIsoLogDate => Severity::Defect,
         }
     }
 }
@@ -179,7 +197,7 @@ impl fmt::Display for Finding {
 mod tests {
     use super::*;
 
-    const ALL: [Rule; 15] = [
+    const ALL: [Rule; 18] = [
         Rule::NotAConcept,
         Rule::MissingType,
         Rule::DuplicateId,
@@ -195,6 +213,9 @@ mod tests {
         Rule::IndexFrontmatter,
         Rule::DanglingIndexEntry,
         Rule::UnknownOkfVersion,
+        Rule::NonIsoLogDate,
+        Rule::LogOutOfOrder,
+        Rule::DanglingLogEntry,
     ];
 
     #[test]
@@ -213,6 +234,8 @@ mod tests {
         assert_eq!(Rule::DerivationCycle.severity(), Severity::Report);
         assert_eq!(Rule::DanglingIndexEntry.severity(), Severity::Report);
         assert_eq!(Rule::UnknownOkfVersion.severity(), Severity::Report);
+        assert_eq!(Rule::LogOutOfOrder.severity(), Severity::Report);
+        assert_eq!(Rule::DanglingLogEntry.severity(), Severity::Report);
         for rule in [
             Rule::NotAConcept,
             Rule::MissingType,
@@ -224,6 +247,7 @@ mod tests {
             Rule::MissingRuntime,
             Rule::InvalidComputationSource,
             Rule::IndexFrontmatter,
+            Rule::NonIsoLogDate,
         ] {
             assert_eq!(rule.severity(), Severity::Defect, "{rule:?}");
         }

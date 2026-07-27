@@ -30,6 +30,7 @@ mod concept;
 mod finding;
 mod index;
 mod links;
+mod log;
 mod paths;
 mod provenance;
 

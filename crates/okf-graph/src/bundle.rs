@@ -14,6 +14,7 @@ use std::path::Path;
 use crate::concept::split_frontmatter;
 use crate::index;
 use crate::links::{links_in, Link, LinkKind};
+use crate::log;
 use crate::paths::{classify_path, resolve_path, PathKind};
 use crate::provenance::{self, Derivation};
 use crate::{Concept, Finding, Rule};
@@ -256,8 +257,10 @@ impl Bundle {
         let reserved = std::mem::take(&mut self.reserved);
         let mut findings = Vec::new();
         for (path, text) in &reserved {
-            if reserved_name(path) == "index.md" {
-                self.check_index(path, text, &mut findings);
+            match reserved_name(path) {
+                "index.md" => self.check_index(path, text, &mut findings),
+                "log.md" => self.check_log(path, text, &mut findings),
+                _ => {}
             }
         }
         self.findings.extend(findings);
@@ -300,6 +303,45 @@ impl Bundle {
                     Rule::DanglingIndexEntry,
                     format!(
                         "index entry `{}` resolves to no concept, file, or directory",
+                        link.target
+                    ),
+                ));
+            }
+        }
+    }
+
+    /// Check one `log.md` (§9): each date heading is ISO-8601, they run
+    /// newest-first, and each entry link resolves.
+    fn check_log(&self, path: &str, text: &str, findings: &mut Vec<Finding>) {
+        let (_, body) = split_frontmatter(text);
+        let headings = log::check_headings(body);
+        for heading in &headings.non_iso {
+            findings.push(Finding::new(
+                path,
+                Rule::NonIsoLogDate,
+                format!("log date heading `{heading}` is not ISO-8601 YYYY-MM-DD (SPEC §9)"),
+            ));
+        }
+        if headings.out_of_order {
+            findings.push(Finding::new(
+                path,
+                Rule::LogOutOfOrder,
+                "log date headings are not in newest-first order (SPEC §9)".to_string(),
+            ));
+        }
+
+        let from = strip_md(path);
+        for link in links_in(body) {
+            let target = match link.kind {
+                LinkKind::BundleAbsolute | LinkKind::Relative => resolve_path(&from, &link.target),
+                LinkKind::External | LinkKind::Fragment => continue,
+            };
+            if !self.entry_resolves(&target) {
+                findings.push(Finding::new(
+                    path,
+                    Rule::DanglingLogEntry,
+                    format!(
+                        "log entry `{}` resolves to no concept, file, or directory",
                         link.target
                     ),
                 ));
