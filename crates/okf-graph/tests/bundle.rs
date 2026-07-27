@@ -345,6 +345,21 @@ fn a_dangling_log_entry_is_a_report() {
     assert_eq!(bundle.findings()[0].file, "log.md");
 }
 
+/// A reference-style body link (`[text][ref]` + `[ref]: /b.md`) resolves to a
+/// concept and becomes an edge, end to end — no dangling report.
+#[test]
+fn a_reference_style_link_becomes_an_edge() {
+    let bundle = Bundle::load(&fixture("reference-links")).expect("loads");
+
+    let edges: Vec<(&str, &str)> = bundle
+        .links()
+        .iter()
+        .map(|e| (e.from.as_str(), e.to.as_str()))
+        .collect();
+    assert_eq!(edges, [("a", "b")]);
+    assert!(bundle.findings().is_empty());
+}
+
 /// A concept's parent is the nearest path ancestor that is itself a concept;
 /// a directory-only scope (no concept file) contributes none.
 #[test]
