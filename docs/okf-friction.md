@@ -112,6 +112,36 @@ computation, and scope descriptors). Held to raise as a single pattern
 observation once the working group engages the open issues, rather than filing
 a fourth in silence.
 
+## 2026-07-28 — §11 conforms over "the tree", which is never defined
+
+[§11][s11] makes a bundle conformant when "every non-reserved `.md` file in the
+tree" parses, but nothing in v0.2 says what "the tree" is: where it is rooted,
+whether a nested bundle inside it is one corpus or two, and — the case that
+bites an implementation — whether a symlink entry is a member of it.
+
+That last one is not hypothetical. Reading symlinks as documents gives one file
+two Concept IDs, and a directory symlink pointing at an ancestor re-walks the
+whole tree once per link the platform will resolve: a single-concept bundle
+loaded as 33 concepts on macOS, which stops there only because the OS refuses a
+34th resolution. The corpus size becomes a property of the platform.
+
+**How okf-graph handles it.** A symlink entry is not a document: it is never
+parsed as a concept, never checked as a reserved file, and never descended
+into. It is still recorded in the file set, so a path-valued field
+([§6.2][s62]) or an index entry naming one resolves rather than dangling — the
+don't-fail-what-the-spec-doesn't-forbid rule the other entries here follow,
+and consistent with dereferencing being consumer policy.
+
+**Not raised upstream** (2026-07-28), because upstream is already fixing it:
+open PR [#232][pr232] adds a §3.2 defining a single bundle root and a
+conformance corpus of "regular `.md` file entries recursively beneath that
+root, excluding symbolic-link entries", and rewrites §11's list in those terms.
+Our behaviour was chosen independently and matches it. Logged as a dated record
+of the ambiguity, not as something to file; if #232 stalls, this is the
+evidence for asking.
+
+[pr232]: https://github.com/GoogleCloudPlatform/knowledge-catalog/pull/232
+[s11]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md#11-conformance
 [issue]: https://github.com/GoogleCloudPlatform/knowledge-catalog/issues/234
 [issue-235]: https://github.com/GoogleCloudPlatform/knowledge-catalog/issues/235
 [issue-236]: https://github.com/GoogleCloudPlatform/knowledge-catalog/issues/236
