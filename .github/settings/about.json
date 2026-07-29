@@ -1,0 +1,13 @@
+{
+  "description": "Rust tools for validating OKF Knowledge Bundles — okf-graph for topology and identity, okf-normative for the normative reading over it.",
+  "homepage": "",
+  "topics": [
+    "deontic-logic",
+    "knowledge-graph",
+    "nix",
+    "okf",
+    "rust",
+    "static-analysis",
+    "validation"
+  ]
+}

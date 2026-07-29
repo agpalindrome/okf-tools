@@ -117,6 +117,10 @@ stays useful.
 - **CI:** `nix flake check` is the single required status check on `main`
   (`.github/rulesets/main.json`, reconciled by `scripts/settings.sh`). It gates
   `cargo fmt --check`, `clippy -D warnings`, and the suite.
+- **Repo settings as code:** `scripts/settings.sh --check` diffs both the
+  ruleset and the About block (`.github/settings/about.json` — description,
+  homepage, topics) against live GitHub; `--apply` writes them. It stays
+  owner-run rather than wired into CI, so settings never change silently.
 - **Docs lint at 80 columns**, and emphasis style must be *consistent within
   each file* (MD049 infers it from the first use — `docs/DESIGN.md` is
   underscore, this file is asterisk). Both bite often.
