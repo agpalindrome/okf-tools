@@ -49,6 +49,10 @@ impl Bundle {
     /// Concept ID. IO errors (an unreadable directory or file) propagate; a
     /// file that is not a well-formed concept does not — it becomes a finding,
     /// so one malformed document never blocks the rest of the bundle.
+    ///
+    /// Symlink entries below `root` are not documents (see `collect`), but
+    /// `root` itself is resolved: the caller named that directory, whatever it
+    /// is on disk.
     pub fn load(root: &Path) -> std::io::Result<Bundle> {
         if !root.is_dir() {
             return Err(std::io::Error::other(format!(
@@ -382,7 +386,7 @@ impl Bundle {
 
 /// Recurse `path`, adding every non-reserved `*.md` to `out` as a concept.
 /// Directory entries are visited in path order so any per-file reporting is
-/// reproducible.
+/// reproducible. A symlink entry is recorded but never read or descended into.
 fn collect(root: &Path, path: &Path, out: &mut Bundle) -> std::io::Result<()> {
     if path.is_dir() {
         let mut entries: Vec<_> = std::fs::read_dir(path)?
@@ -392,6 +396,18 @@ fn collect(root: &Path, path: &Path, out: &mut Bundle) -> std::io::Result<()> {
             .collect();
         entries.sort();
         for entry in entries {
+            // A symlink aliases a document rather than being one. Reading it
+            // would give the same file a second Concept ID, and a directory
+            // symlink to an ancestor re-walks the whole tree until the OS
+            // refuses to resolve any deeper — a corpus multiplied by however
+            // many links the platform allows, which is not a bundle property.
+            // It is still recorded in `files`, so a path-valued field (§6.2) or
+            // an index entry naming one resolves: whether to follow it is the
+            // consumer's business, not this checker's.
+            if std::fs::symlink_metadata(&entry)?.file_type().is_symlink() {
+                out.files.insert(rel_path(root, &entry));
+                continue;
+            }
             collect(root, &entry, out)?;
         }
     } else {

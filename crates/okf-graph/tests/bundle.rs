@@ -430,3 +430,85 @@ fn children_attach_to_their_nearest_concept_ancestor() {
     );
     assert!(bundle.children("orphan/deep").is_empty());
 }
+
+/// A bundle built under `CARGO_TARGET_TMPDIR` at run time. Symlinks are not
+/// committed as fixtures: a checked-in directory cycle would be walked by
+/// `markdownlint` and the nix build long before a test ran.
+#[cfg(unix)]
+fn scratch(name: &str) -> PathBuf {
+    let dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join(name);
+    // `remove_dir_all` unlinks symlinks rather than following them, so a leftover
+    // cycle from an earlier run is safe to clear.
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).expect("scratch dir");
+    dir
+}
+
+#[cfg(unix)]
+fn write(path: &std::path::Path, text: &str) {
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).expect("parent dir");
+    }
+    std::fs::write(path, text).expect("write");
+}
+
+/// A symlinked `.md` aliases a document that is already in the bundle; loading
+/// it again would give one file two Concept IDs.
+#[cfg(unix)]
+#[test]
+fn a_symlinked_markdown_file_is_not_a_second_concept() {
+    let dir = scratch("symlinked-markdown");
+    write(&dir.join("real/a.md"), "---\ntype: Thing\n---\n\nbody\n");
+    std::os::unix::fs::symlink("real/a.md", dir.join("alias.md")).expect("symlink");
+
+    let bundle = Bundle::load(&dir).expect("loads");
+
+    let ids: Vec<&str> = bundle.concepts().map(|(id, _)| id).collect();
+    assert_eq!(ids, ["real/a"]);
+    assert!(bundle.concept("alias").is_none());
+    assert!(bundle.findings().is_empty(), "{:?}", bundle.findings());
+}
+
+/// A directory symlink pointing at an ancestor is a cycle. Following it re-walks
+/// the tree once per link the platform will resolve, so the same file arrives as
+/// dozens of concepts under dozens of ids — the failure this guard exists for.
+#[cfg(unix)]
+#[test]
+fn a_directory_symlink_cycle_does_not_multiply_the_bundle() {
+    let dir = scratch("symlink-cycle");
+    write(&dir.join("a.md"), "---\ntype: Thing\n---\n\nbody\n");
+    std::fs::create_dir_all(dir.join("sub")).expect("sub");
+    std::os::unix::fs::symlink("..", dir.join("sub/loop")).expect("symlink");
+
+    let bundle = Bundle::load(&dir).expect("loads");
+
+    assert_eq!(bundle.len(), 1);
+    assert!(bundle.concept("a").is_some());
+    assert!(bundle.findings().is_empty(), "{:?}", bundle.findings());
+}
+
+/// Excluding symlinks from the corpus must not turn one into a dangling path:
+/// a `resource` naming a symlinked file still resolves, because the file set
+/// records the entry even though nothing reads through it.
+#[cfg(unix)]
+#[test]
+fn a_path_field_naming_a_symlink_still_resolves() {
+    let dir = scratch("symlinked-resource");
+    write(&dir.join("references/real.sql"), "SELECT 1;\n");
+    write(
+        &dir.join("thing.md"),
+        "---\ntype: Attested Computation\nruntime: bigquery\ncomputation: /alias.sql\n---\n\nbody\n",
+    );
+    std::os::unix::fs::symlink("references/real.sql", dir.join("alias.sql")).expect("symlink");
+
+    let bundle = Bundle::load(&dir).expect("loads");
+
+    assert!(
+        !bundle
+            .findings()
+            .iter()
+            .any(|f| f.rule == Rule::DanglingPath),
+        "{:?}",
+        bundle.findings()
+    );
+}
