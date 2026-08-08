@@ -58,8 +58,13 @@ impl Concept {
 ///
 /// Every accessor answers `Some` only when the key is present *and* holds the
 /// shape §4.1 describes. That conflates "absent" with "present but the wrong
-/// shape" deliberately: neither is this type's to judge, and the block is kept
-/// whole so a conformance check can tell them apart.
+/// shape" deliberately: neither is this type's to judge. [`declares`] and
+/// [`scalar`] tell them apart, and [`source`] keeps the block whole for what
+/// they cannot reach.
+///
+/// [`declares`]: Frontmatter::declares
+/// [`scalar`]: Frontmatter::scalar
+/// [`source`]: Frontmatter::source
 #[derive(Debug, Clone, PartialEq)]
 pub struct Frontmatter {
     source: String,
@@ -245,18 +250,43 @@ impl Frontmatter {
         &self.source
     }
 
-    /// Whether the block declares `key` at all, of any shape. Lets a check tell
-    /// "absent" (fine) from "present but the wrong shape" (a finding) — the
-    /// distinction the `Some`-only-on-shape readers deliberately drop.
-    pub(crate) fn declares(&self, key: &str) -> bool {
+    /// Whether the block declares `key` at all, of any shape. Tells "absent"
+    /// (fine) from "present but the wrong shape" (a finding) — the distinction
+    /// the `Some`-only-on-shape readers deliberately drop, so
+    /// `declares("status") && status().is_none()` is the malformed case.
+    ///
+    /// It pairs with the `Option` readers, not the `Vec` ones: a well-formed
+    /// `sources: []` and a malformed non-list both read as an empty `Vec` with
+    /// `declares` true. Top-level keys only — [`executor_receipt_malformed`] is
+    /// the one nested question answered directly.
+    ///
+    /// [`executor_receipt_malformed`]: Frontmatter::executor_receipt_malformed
+    pub fn declares(&self, key: &str) -> bool {
         self.fields.contains_key(key)
+    }
+
+    /// The scalar at `key`, rendered as the document wrote it. Separates two
+    /// failures [`status`] reports alike: `provisional` is an unmodelled stage,
+    /// `true` is a value nothing can read, and the two want different fixes.
+    ///
+    /// `None` is absent *or* a mapping or list, so pair it with [`declares`] to
+    /// tell those apart. An explicit null reads as `""` rather than `None`,
+    /// because the document did write the key.
+    ///
+    /// [`status`]: Frontmatter::status
+    /// [`declares`]: Frontmatter::declares
+    pub fn scalar(&self, key: &str) -> Option<String> {
+        scalar(self.fields.get(key))
     }
 
     /// Whether a declared `executor.receipt` is present but not a list of
     /// strings (§10.2). Absent is fine — `receipt` is optional; this only flags
-    /// a present-but-wrong-shape value, which `executor()` cannot tell from
-    /// absent (both read as an empty `Vec`).
-    pub(crate) fn executor_receipt_malformed(&self) -> bool {
+    /// a present-but-wrong-shape value, which [`executor`] cannot tell from
+    /// absent (both read as an empty `Vec`) and [`declares`] cannot reach.
+    ///
+    /// [`executor`]: Frontmatter::executor
+    /// [`declares`]: Frontmatter::declares
+    pub fn executor_receipt_malformed(&self) -> bool {
         let Some(receipt) = self.fields.get("executor").and_then(|e| e.get("receipt")) else {
             return false;
         };
@@ -272,12 +302,6 @@ impl Frontmatter {
             Some(Value::String(s)) => Some(s.as_str()),
             _ => None,
         }
-    }
-
-    /// The scalar at `key`, rendered as written — see [`scalar_at`], which does
-    /// the same job one level down, inside a mapping.
-    fn scalar(&self, key: &str) -> Option<String> {
-        scalar(self.fields.get(key))
     }
 }
 
