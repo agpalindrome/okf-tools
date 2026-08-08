@@ -7,6 +7,15 @@ may break the API, and an MSRV change is one of the things that earns it.
 
 ### Added
 
+- A bundle holding **no concepts** is a usage error on the binary (exit `2`),
+  with `--allow-empty` to opt out. A green run over an empty bundle is
+  indistinguishable from a green run over a valid one, which is how a mistyped
+  path or a bundle that never generated passes CI. Deliberately not a rule: §11
+  has no opinion that a bundle must hold concepts, so giving it a `Severity`
+  would misstate the spec — it is the same class as naming a path that is not a
+  directory. `Bundle::load` is unchanged and `Bundle::is_empty` still answers
+  for a library consumer. Named in
+  [#90](https://github.com/ojhermann-org/okf-tools/issues/90).
 - **Caller-supplied checks**: a `Check` trait, a `Checks` set that verifies codes
   are unique, and `Bundle::check`. A caller writes its own requirements — a house
   key in every frontmatter, a `generated.at` §5.2 does not require — and
