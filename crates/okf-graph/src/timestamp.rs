@@ -1,4 +1,7 @@
-//! An instant, parsed from the RFC 3339 profile of ISO 8601.
+//! The two shapes §5 gives a moment: an instant ([`Timestamp`]) and a calendar
+//! day ([`Date`]). They share the calendar arithmetic, which is the reason they
+//! share a module — a date that both types accept is one fewer way for a bundle
+//! to be read two ways.
 //!
 //! §5.2 types `generated.at` and `verified[].at` as "an ISO 8601 datetime",
 //! which names a family of formats rather than one. Its week date is the member
@@ -8,6 +11,46 @@
 //! inverted for input the spec permits. okf-graph narrows to RFC 3339, the
 //! profile every §5.2 example already uses; `docs/okf-friction.md` records the
 //! narrowing as a decision the spec text has not made.
+
+/// A calendar day, read from the `YYYY-MM-DD` form §5 uses for `stale_after`
+/// (§5.5), `sources[].last_modified` and a `usage_window` bound (§5.1).
+///
+/// Ordering is chronological, which is what the fields are for: §5.5 defines
+/// staleness as `today >= stale_after`, and a `usage_window` is a range only if
+/// its bounds compare. Zero-padded `YYYY-MM-DD` also sorts correctly as text, so
+/// the type buys calendar validity rather than ordering — `2026-02-30` is a
+/// string that sorts fine and names no day.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Date {
+    year: i64,
+    month: u32,
+    day: u32,
+}
+
+impl Date {
+    /// Read a `YYYY-MM-DD` date, or `None` when `text` is not one.
+    ///
+    /// Stricter than the `LOG-1` heading check in `log.rs`, which takes any
+    /// plausible month and day: §9 needs only to tell a date from prose, while
+    /// a field a consumer computes with has to name a day that exists.
+    pub fn parse(text: &str) -> Option<Self> {
+        let bytes = text.as_bytes();
+        if bytes.len() != 10 || bytes[4] != b'-' || bytes[7] != b'-' {
+            return None;
+        }
+        let year = digits(text.get(0..4)?)?;
+        let month = digits(text.get(5..7)?)?;
+        let day = digits(text.get(8..10)?)?;
+        if !(1..=12).contains(&month) || day < 1 || day > days_in_month(year, month) {
+            return None;
+        }
+        Some(Date {
+            year,
+            month: month as u32,
+            day: day as u32,
+        })
+    }
+}
 
 /// A point in time, read from an RFC 3339 `date-time`.
 ///
@@ -159,6 +202,39 @@ fn days_in_month(year: i64, month: i64) -> i64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_date_parses_and_orders_chronologically() {
+        let earlier = Date::parse("2026-06-01").expect("parses");
+        let later = Date::parse("2026-06-30").expect("parses");
+        assert!(earlier < later);
+        assert_eq!(Date::parse("2024-02-29"), Date::parse("2024-02-29"));
+    }
+
+    /// The failure a text comparison cannot see: a date that sorts correctly and
+    /// names no day.
+    #[test]
+    fn a_date_no_calendar_has_is_rejected() {
+        assert!("2026-02-30" > "2026-02-28");
+        assert!(Date::parse("2026-02-30").is_none());
+        assert!(Date::parse("2023-02-29").is_none());
+        assert!(Date::parse("2026-13-01").is_none());
+        assert!(Date::parse("2026-06-00").is_none());
+    }
+
+    #[test]
+    fn a_date_that_is_not_the_padded_form_is_rejected() {
+        for text in [
+            "2026-6-01",            // unpadded month
+            "20260601",             // basic format
+            "2026-06-01T00:00:00Z", // a datetime, not a date
+            "2026-W01-1",           // week date
+            "2026-06",              // no day
+            "",
+        ] {
+            assert!(Date::parse(text).is_none(), "{text} should not parse");
+        }
+    }
 
     /// The anchors come from `date -u --date=<text> +%s` (GNU coreutils 9.11,
     /// 2026-08-08), so the civil-date arithmetic is checked against something

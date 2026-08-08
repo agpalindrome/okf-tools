@@ -145,11 +145,13 @@ impl Frontmatter {
     }
 
     /// `stale_after` — the absolute `YYYY-MM-DD` date on or after which the
-    /// concept is stale (§5.5), kept as written. Whether it parses as a date,
-    /// and whether today is past it, are questions for a consumer, not this
-    /// reader.
-    pub fn stale_after(&self) -> Option<&str> {
-        self.string("stale_after")
+    /// concept is stale (§5.5), kept as written so a malformed one can be
+    /// reported; [`Date::parse`] turns it into a value. Whether today is past it
+    /// stays a consumer's question.
+    ///
+    /// [`Date::parse`]: crate::Date::parse
+    pub fn stale_after(&self) -> Option<String> {
+        self.scalar("stale_after")
     }
 
     /// `generated` — how the current content was produced (§5.2): an actor
@@ -271,6 +273,12 @@ impl Frontmatter {
             _ => None,
         }
     }
+
+    /// The scalar at `key`, rendered as written — see [`scalar_at`], which does
+    /// the same job one level down, inside a mapping.
+    fn scalar(&self, key: &str) -> Option<String> {
+        scalar(self.fields.get(key))
+    }
 }
 
 /// A concept's lifecycle `status` (§5.4). Absent defaults to `Stable`, but that
@@ -322,7 +330,11 @@ pub struct Source {
     pub author: Option<String>,
     /// How often `resource` was exercised over the `usage_window`.
     pub usage_count: Option<i64>,
-    /// When the source itself last changed (`YYYY-MM-DD`).
+    /// Whether `usage_count` is declared but is not an integer. Without it, a
+    /// `usage_count: many` is indistinguishable from an absent one, and a signal
+    /// nothing can read is worth saying out loud (§5.1).
+    pub usage_count_malformed: bool,
+    /// When the source itself last changed (`YYYY-MM-DD`), as written.
     pub last_modified: Option<String>,
     /// A per-source `{ from, to }` range overriding the shared one.
     pub usage_window: Option<UsageWindow>,
@@ -331,9 +343,9 @@ pub struct Source {
 /// The `{ from, to }` date range that frames a `usage_count` (§5.1).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UsageWindow {
-    /// Start of the window (`YYYY-MM-DD`).
+    /// Start of the window (`YYYY-MM-DD`), as written.
     pub from: Option<String>,
-    /// End of the window (`YYYY-MM-DD`).
+    /// End of the window (`YYYY-MM-DD`), as written.
     pub to: Option<String>,
 }
 
@@ -353,7 +365,10 @@ fn source_entry(value: &Value) -> Option<Source> {
         title: str_at(value, "title"),
         author: str_at(value, "author"),
         usage_count: value.get("usage_count").and_then(Value::as_i64),
-        last_modified: str_at(value, "last_modified"),
+        usage_count_malformed: value
+            .get("usage_count")
+            .is_some_and(|count| count.as_i64().is_none()),
+        last_modified: scalar_at(value, "last_modified"),
         usage_window: value.get("usage_window").and_then(usage_window),
     })
 }
@@ -361,8 +376,8 @@ fn source_entry(value: &Value) -> Option<Source> {
 /// Read a `{ from, to }` window from a value, if it is a mapping.
 fn usage_window(value: &Value) -> Option<UsageWindow> {
     value.is_mapping().then(|| UsageWindow {
-        from: str_at(value, "from"),
-        to: str_at(value, "to"),
+        from: scalar_at(value, "from"),
+        to: scalar_at(value, "to"),
     })
 }
 
@@ -428,7 +443,13 @@ fn string_list(value: &Value, key: &str) -> Vec<String> {
 /// see. A mapping or a list is a different defect — a field whose shape is wrong
 /// rather than a datetime that is — and stays `None`.
 fn scalar_at(value: &Value, key: &str) -> Option<String> {
-    match value.get(key) {
+    scalar(value.get(key))
+}
+
+/// A scalar rendered as the document wrote it; `None` for a mapping, a list, or
+/// nothing at all.
+fn scalar(value: Option<&Value>) -> Option<String> {
+    match value {
         Some(Value::String(s)) => Some(s.clone()),
         Some(Value::Number(n)) => Some(n.to_string()),
         Some(Value::Bool(b)) => Some(b.to_string()),

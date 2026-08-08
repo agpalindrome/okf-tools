@@ -94,6 +94,16 @@ pub enum Rule {
     /// it, and §11's list of what a consumer must tolerate does not reach a
     /// malformed one.
     MalformedTimestamp,
+    /// CONCEPT-13: `stale_after` is present but not a `YYYY-MM-DD` date (§5.5).
+    /// A defect, on the same reading as CONCEPT-12: §5.5 states the format, and
+    /// a staleness decision a consumer cannot make is worse than an absent one.
+    MalformedStaleAfter,
+    /// CONCEPT-14: a §5.1 credibility signal is present but unusable — a
+    /// `last_modified` or `usage_window` bound that is not `YYYY-MM-DD`, or a
+    /// `usage_count` that is not an integer. A report, matching CONCEPT-9 and
+    /// CONCEPT-10: these are supporting signals a consumer weighs, not a
+    /// required core it needs.
+    MalformedSourceSignal,
 }
 
 impl Rule {
@@ -122,6 +132,8 @@ impl Rule {
             Rule::IncompleteAttestation => "CONCEPT-10",
             Rule::EmptyComputation => "CONCEPT-11",
             Rule::MalformedTimestamp => "CONCEPT-12",
+            Rule::MalformedStaleAfter => "CONCEPT-13",
+            Rule::MalformedSourceSignal => "CONCEPT-14",
         }
     }
 
@@ -150,6 +162,8 @@ impl Rule {
             Rule::IncompleteAttestation => "incomplete attestation contract",
             Rule::EmptyComputation => "empty computation",
             Rule::MalformedTimestamp => "malformed timestamp",
+            Rule::MalformedStaleAfter => "malformed stale_after",
+            Rule::MalformedSourceSignal => "malformed source signal",
         }
     }
 
@@ -164,7 +178,8 @@ impl Rule {
             | Rule::LogOutOfOrder
             | Rule::DanglingLogEntry
             | Rule::MalformedParameter
-            | Rule::IncompleteAttestation => Severity::Report,
+            | Rule::IncompleteAttestation
+            | Rule::MalformedSourceSignal => Severity::Report,
             Rule::NotAConcept
             | Rule::MissingType
             | Rule::DuplicateId
@@ -177,7 +192,8 @@ impl Rule {
             | Rule::IndexFrontmatter
             | Rule::NonIsoLogDate
             | Rule::EmptyComputation
-            | Rule::MalformedTimestamp => Severity::Defect,
+            | Rule::MalformedTimestamp
+            | Rule::MalformedStaleAfter => Severity::Defect,
         }
     }
 }
@@ -227,7 +243,7 @@ impl fmt::Display for Finding {
 mod tests {
     use super::*;
 
-    const ALL: [Rule; 22] = [
+    const ALL: [Rule; 24] = [
         Rule::NotAConcept,
         Rule::MissingType,
         Rule::DuplicateId,
@@ -250,6 +266,8 @@ mod tests {
         Rule::IncompleteAttestation,
         Rule::EmptyComputation,
         Rule::MalformedTimestamp,
+        Rule::MalformedStaleAfter,
+        Rule::MalformedSourceSignal,
     ];
 
     #[test]
@@ -272,6 +290,7 @@ mod tests {
         assert_eq!(Rule::DanglingLogEntry.severity(), Severity::Report);
         assert_eq!(Rule::MalformedParameter.severity(), Severity::Report);
         assert_eq!(Rule::IncompleteAttestation.severity(), Severity::Report);
+        assert_eq!(Rule::MalformedSourceSignal.severity(), Severity::Report);
         for rule in [
             Rule::NotAConcept,
             Rule::MissingType,
@@ -286,6 +305,7 @@ mod tests {
             Rule::NonIsoLogDate,
             Rule::EmptyComputation,
             Rule::MalformedTimestamp,
+            Rule::MalformedStaleAfter,
         ] {
             assert_eq!(rule.severity(), Severity::Defect, "{rule:?}");
         }

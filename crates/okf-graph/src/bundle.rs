@@ -17,7 +17,7 @@ use crate::links::{links_in, Link, LinkKind};
 use crate::log;
 use crate::paths::{classify_path, resolve_path, PathKind};
 use crate::provenance::{self, Derivation};
-use crate::{Concept, Finding, Rule, Timestamp};
+use crate::{Concept, Date, Finding, Rule, Timestamp, UsageWindow};
 
 /// A resolved body-link edge: the linking concept points at another concept in
 /// the same bundle (SPEC §6). A link that resolves to no concept is a dangling
@@ -497,6 +497,21 @@ fn check_concept(file: &str, concept: &Concept) -> Vec<Finding> {
         }
     }
 
+    // CONCEPT-13: a declared `stale_after` must be a `YYYY-MM-DD` date (§5.5).
+    if let Some(stale_after) = fm.stale_after() {
+        if Date::parse(&stale_after).is_none() {
+            findings.push(Finding::new(
+                file,
+                Rule::MalformedStaleAfter,
+                format!("`stale_after` = `{stale_after}` is not a `YYYY-MM-DD` date (SPEC §5.5)"),
+            ));
+        }
+    }
+
+    // CONCEPT-14: the shared `usage_window` frames every `usage_count` (§5.1),
+    // so a bound nothing can read costs every source's signal, not one.
+    findings.extend(window_findings(file, "usage_window", fm.usage_window()));
+
     // CONCEPT-6 / CONCEPT-5: each source needs a `resource` (§5.1 REQUIRED), and
     // an `author`, if present, must be a well-formed actor (§7).
     for (i, source) in fm.sources().iter().enumerate() {
@@ -514,6 +529,27 @@ fn check_concept(file: &str, concept: &Concept) -> Vec<Finding> {
         if let Some(author) = source.author.as_deref() {
             findings.extend(actor_finding(file, &format!("sources[{i}].author"), author));
         }
+
+        // CONCEPT-14: the per-source credibility signals (§5.1).
+        if let Some(last_modified) = source.last_modified.as_deref() {
+            findings.extend(date_finding(
+                file,
+                &format!("sources[{i}].last_modified"),
+                last_modified,
+            ));
+        }
+        if source.usage_count_malformed {
+            findings.push(Finding::new(
+                file,
+                Rule::MalformedSourceSignal,
+                format!("`sources[{i}].usage_count` is not an integer (SPEC §5.1)"),
+            ));
+        }
+        findings.extend(window_findings(
+            file,
+            &format!("sources[{i}].usage_window"),
+            source.usage_window.clone(),
+        ));
     }
 
     // §10 Attested Computation — type-conditional: these apply only to a concept
@@ -634,6 +670,31 @@ fn actor_finding(file: &str, field: &str, value: &str) -> Option<Finding> {
         file,
         Rule::MalformedActor,
         format!("`{field}` = `{value}` is not a `producer/version` or `scheme:id` actor (SPEC §7)"),
+    ))
+}
+
+/// The `CONCEPT-14` findings for a `{ from, to }` window, in field order.
+fn window_findings(file: &str, field: &str, window: Option<UsageWindow>) -> Vec<Finding> {
+    let Some(window) = window else {
+        return Vec::new();
+    };
+    [("from", window.from), ("to", window.to)]
+        .into_iter()
+        .filter_map(|(bound, value)| {
+            date_finding(file, &format!("{field}.{bound}"), value.as_deref()?)
+        })
+        .collect()
+}
+
+/// A `CONCEPT-14` finding when `value` is present but not a `YYYY-MM-DD` date.
+fn date_finding(file: &str, field: &str, value: &str) -> Option<Finding> {
+    if Date::parse(value).is_some() {
+        return None;
+    }
+    Some(Finding::new(
+        file,
+        Rule::MalformedSourceSignal,
+        format!("`{field}` = `{value}` is not a `YYYY-MM-DD` date (SPEC §5.1)"),
     ))
 }
 
