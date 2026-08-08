@@ -160,7 +160,7 @@ impl Frontmatter {
         let value = self.fields.get("generated")?;
         value.is_mapping().then(|| Generated {
             by: str_at(value, "by"),
-            at: str_at(value, "at"),
+            at: scalar_at(value, "at"),
         })
     }
 
@@ -286,13 +286,15 @@ pub enum Status {
 }
 
 /// The `generated` trust family (§5.2): who produced the current content and
-/// when. Both are read as written; `by` should be an actor (§7) and `at` an
-/// ISO-8601 datetime, but whether they are is a check's or a consumer's call.
+/// when. Both are read as written, so a malformed one can be reported rather
+/// than dropped; [`Timestamp::parse`] is what turns `at` into a value.
+///
+/// [`Timestamp::parse`]: crate::Timestamp::parse
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Generated {
     /// The actor that produced the content (§7). Required by §5.2.
     pub by: Option<String>,
-    /// The ISO-8601 datetime of the last meaningful change.
+    /// The datetime of the last meaningful change, as written.
     pub at: Option<String>,
 }
 
@@ -301,7 +303,7 @@ pub struct Generated {
 pub struct Verification {
     /// The actor that confirmed the content (§7).
     pub by: Option<String>,
-    /// The ISO-8601 datetime of the confirmation.
+    /// The datetime of the confirmation, as written.
     pub at: Option<String>,
 }
 
@@ -339,7 +341,7 @@ pub struct UsageWindow {
 fn verification(value: &Value) -> Option<Verification> {
     value.is_mapping().then(|| Verification {
         by: str_at(value, "by"),
-        at: str_at(value, "at"),
+        at: scalar_at(value, "at"),
     })
 }
 
@@ -415,6 +417,23 @@ fn string_list(value: &Value, key: &str) -> Vec<String> {
             })
             .collect(),
         _ => Vec::new(),
+    }
+}
+
+/// The scalar at `value[key]`, rendered as the document wrote it.
+///
+/// Unlike [`str_at`], a number or a boolean reads as its own text rather than as
+/// absent: YAML resolves `at: 2026` to a number, and returning `None` there
+/// would hand a mistyped timestamp to a check that reports only on what it can
+/// see. A mapping or a list is a different defect — a field whose shape is wrong
+/// rather than a datetime that is — and stays `None`.
+fn scalar_at(value: &Value, key: &str) -> Option<String> {
+    match value.get(key) {
+        Some(Value::String(s)) => Some(s.clone()),
+        Some(Value::Number(n)) => Some(n.to_string()),
+        Some(Value::Bool(b)) => Some(b.to_string()),
+        Some(Value::Null) => Some(String::new()),
+        _ => None,
     }
 }
 

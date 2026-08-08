@@ -138,6 +138,26 @@ fn generated_without_by_is_reported() {
     assert_eq!(bundle.findings()[0].file, "thing.md");
 }
 
+/// An `at` that is ISO 8601 but not RFC 3339 is reported as CONCEPT-12 (§5.2),
+/// at both places §5.2 puts one. The week date is the case that motivates the
+/// rule: it passes every length-and-separator check a consumer is likely to
+/// write, and sorts after every calendar date.
+#[test]
+fn a_non_rfc_3339_timestamp_is_reported() {
+    let bundle = Bundle::load(&fixture("bad-timestamp")).expect("loads");
+
+    let findings = bundle.findings();
+    assert_eq!(findings.len(), 3);
+    assert!(findings.iter().all(|f| f.rule == Rule::MalformedTimestamp));
+    // `at: 2026` is a YAML number, and reading only strings would drop it.
+    assert_eq!(findings[0].file, "mistyped.md");
+    assert!(findings[0].detail.contains("`generated.at` = `2026`"));
+    assert_eq!(findings[1].file, "reviewed.md");
+    assert!(findings[1].detail.contains("`verified[0].at`"));
+    assert_eq!(findings[2].file, "thing.md");
+    assert!(findings[2].detail.contains("2026-W01-1T00:00:00Z"));
+}
+
 /// A `by` that is a bare token, not `producer/version` or `scheme:id`, is
 /// reported as CONCEPT-5 (§7).
 #[test]

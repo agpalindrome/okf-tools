@@ -287,6 +287,21 @@ fn reads_generated_and_a_verified_list() {
     assert_eq!(verified[1].by.as_deref(), Some("process:finance-nightly"));
 }
 
+/// An `at` YAML resolves to a number reads back as its own text, not as absent:
+/// a check that saw `None` there would pass a mistyped timestamp silently.
+#[test]
+fn a_numeric_at_reads_back_as_written() {
+    let concept =
+        Concept::parse("---\ntype: Reference\ngenerated: { by: human:x, at: 2026 }\n---\n")
+            .expect("parses");
+
+    let generated = concept
+        .frontmatter()
+        .generated()
+        .expect("generated is present");
+    assert_eq!(generated.at.as_deref(), Some("2026"));
+}
+
 /// The §5.2 MUST: a bare `verified: { by, at }` mapping is one event, not zero.
 #[test]
 fn a_bare_verified_mapping_counts_as_one() {

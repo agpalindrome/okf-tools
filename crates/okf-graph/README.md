@@ -24,7 +24,8 @@ Every rule the spec makes checkable ships as a _located finding_, at two levels:
 
 - **Per-concept** reads a single document against [§4]'s shape and the optional
   [§5] families — a present, non-empty `type`; frontmatter field shapes; the
-  provenance / trust / lifecycle metadata; the actor convention ([§7]); and the
+  provenance / trust / lifecycle metadata; the actor convention ([§7]); the
+  `generated.at` and `verified[].at` timestamps, read as RFC 3339; and the
   Attested-Computation contract ([§10]).
 - **Whole-bundle** reads the graph — unique Concept IDs and reserved-file
   exclusion, body-link resolution, the path-valued fields and the `references/`
