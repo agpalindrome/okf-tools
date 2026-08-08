@@ -137,3 +137,49 @@ fn an_unknown_rule_code_exits_two() {
     let missing = okf_graph().arg("--deny").output().expect("runs");
     assert_eq!(missing.status.code(), Some(2));
 }
+
+/// A bundle with no concepts is a usage error, not a clean run: a mistyped path
+/// or a bundle that never generated would otherwise pass CI green.
+#[test]
+fn a_bundle_with_no_concepts_exits_two() {
+    let dir = std::env::temp_dir().join("okf-graph-cli-empty");
+    std::fs::create_dir_all(&dir).expect("mkdir");
+
+    let output = okf_graph().arg(&dir).output().expect("runs");
+    assert_eq!(output.status.code(), Some(2));
+    assert!(
+        String::from_utf8_lossy(&output.stderr).contains("no concepts found"),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+/// Reserved files are not concepts, so a directory holding only an `index.md`
+/// is empty for this purpose — and its own findings do not rescue it.
+#[test]
+fn reserved_files_alone_are_still_an_empty_bundle() {
+    let output = okf_graph()
+        .arg(fixture("reserved-only"))
+        .output()
+        .expect("runs");
+    assert_eq!(output.status.code(), Some(2));
+}
+
+/// `--allow-empty` is the opt-out for a caller that expects one.
+#[test]
+fn allow_empty_accepts_a_bundle_with_no_concepts() {
+    let dir = std::env::temp_dir().join("okf-graph-cli-empty-ok");
+    std::fs::create_dir_all(&dir).expect("mkdir");
+
+    let output = okf_graph()
+        .arg("--allow-empty")
+        .arg(&dir)
+        .output()
+        .expect("runs");
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}

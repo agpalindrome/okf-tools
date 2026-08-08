@@ -45,7 +45,9 @@ is checked per kind, the defect/report cut, the deferred boundary — is in the
 `nix run .#okf-graph -- <bundle>` validates one bundle directory (searched
 recursively for concept files). `nix run .` stays `deon-check`; this binary is
 its sibling. Exit codes: `0` = no defects (reports may still print), `1` = one
-or more defects, `2` = usage / IO error.
+or more defects, `2` = usage / IO error — which includes a bundle holding no
+concepts, since a green run over one is indistinguishable from a green run over
+a real bundle. Pass `--allow-empty` where that is expected.
 
 ```sh
 # A clean bundle → no findings (exit 0).

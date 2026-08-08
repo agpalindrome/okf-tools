@@ -21,7 +21,7 @@ const USAGE: &str = "\
 okf-graph — structural / topological validator for an OKF Knowledge Bundle
 
 Usage:
-    okf-graph [--quiet] [--deny|--warn|--allow <CODE>]... <bundle>
+    okf-graph [--quiet] [--allow-empty] [--deny|--warn|--allow <CODE>]... <bundle>
 
 Arguments:
     <bundle>       a bundle directory, searched recursively for concept files
@@ -30,6 +30,7 @@ Options:
     --deny <CODE>  fail the run on this rule
     --warn <CODE>  print this rule but do not fail on it
     --allow <CODE> do not report this rule at all
+    --allow-empty  accept a bundle holding no concepts
     --quiet        print findings only (suppress the summary line)
     -h, --help     show this help
 
@@ -45,10 +46,16 @@ The defaults are the spec's: §6 and §11 say a consumer MUST NOT reject a bundl
 over a dangling link. A producer checking a bundle it owns is not that consumer,
 so a rule can be moved by code — `--deny BUNDLE-2` fails on a dangling link and
 leaves every other tolerated rule alone. Repeating a code is last-wins, and
-`--allow` is counted in the summary rather than vanishing.";
+`--allow` is counted in the summary rather than vanishing.
+
+A bundle holding no concepts is a usage error (exit 2), not a clean run. A
+mistyped path or a bundle that failed to generate would otherwise produce a
+green run indistinguishable from a valid one. Pass `--allow-empty` where an
+empty bundle is expected.";
 
 fn main() -> ExitCode {
     let mut quiet = false;
+    let mut allow_empty = false;
     let mut policy = Policy::new();
     let mut bundle_path: Option<String> = None;
     let mut args = std::env::args().skip(1);
@@ -60,6 +67,7 @@ fn main() -> ExitCode {
                 return ExitCode::SUCCESS;
             }
             "--quiet" => quiet = true,
+            "--allow-empty" => allow_empty = true,
             "--deny" | "--warn" | "--allow" => {
                 let level = match arg.as_str() {
                     "--deny" => Level::Defect,
@@ -96,6 +104,19 @@ fn main() -> ExitCode {
             return ExitCode::from(2);
         }
     };
+
+    // A bundle with no concepts examined nothing, and a green run there is
+    // indistinguishable from a green run over a valid bundle — which is how a
+    // mistyped path or a bundle that never generated passes CI. Not a rule: §11
+    // has no opinion that a bundle must hold concepts, so a `Severity` would
+    // misstate the spec. It is the same class as naming a path that is not a
+    // directory, and it exits the same way.
+    if bundle.is_empty() && !allow_empty {
+        eprintln!(
+            "error: {bundle_path}: no concepts found (pass --allow-empty if that is expected)"
+        );
+        return ExitCode::from(2);
+    }
 
     let findings = bundle.findings_at(&policy);
     for finding in &findings {
