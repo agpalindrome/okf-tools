@@ -140,6 +140,37 @@ Our behaviour was chosen independently and matches it. Logged as a dated record
 of the ambiguity, not as something to file; if #232 stalls, this is the
 evidence for asking.
 
+## 2026-08-08 — "an ISO 8601 datetime" (§5.2) admits a form that sorts backwards
+
+[§5.2][s52] types `generated.at` and `verified[].at` as "an ISO 8601 datetime"
+and narrows it no further. ISO 8601 is a family of formats, and the week date is
+the member that bites: `2026-W01-1T00:00:00Z` denotes 2025-12-29, yet it is the
+same length as the calendar form, carries the same separators at the same
+offsets, and sorts *after* every calendar date, because `W` exceeds every digit.
+
+So a consumer comparing the two fields as strings — the obvious implementation,
+since both arrive as strings — reads a week-dated verification as newer than any
+calendar-dated regeneration. The input is legal, so nothing warns. That is not
+hypothetical: a downstream bundle's staleness check pinned
+the format by testing the length, the trailing `Z`, and the separators at
+offsets 4 and 10, and a week date satisfies all four (issue #72).
+
+**How okf-graph handles it.** It reads `at` as RFC 3339 and reports `CONCEPT-12`
+when it will not parse — a defect, because §5.2 states the type rather than
+suggesting it, and §11's list of what a consumer must tolerate does not reach a
+malformed one. The narrowing costs a conformant author nothing: all 15 `at`
+values in v0.2's examples are `YYYY-MM-DDTHH:MM:SSZ`, which RFC 3339 admits.
+This is the one entry here where okf-graph is *stricter* than the text rather
+than more permissive, so it is the one to revisit first if the working group
+answers otherwise.
+
+**The question for upstream.** Does §5.2 mean the RFC 3339 profile its every
+example uses, or ISO 8601 entire? The looser reading obliges a consumer to
+handle week dates, ordinal dates, and the basic format, none of which appear
+anywhere in the spec. It also makes the fields unsafe to order, which is what
+comparing `verified` against `generated` exists to do. **Not raised upstream**
+(2026-08-08); raising it is the owner's call.
+
 [pr232]: https://github.com/GoogleCloudPlatform/knowledge-catalog/pull/232
 [s11]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md#11-conformance
 [issue]: https://github.com/GoogleCloudPlatform/knowledge-catalog/issues/234
@@ -148,6 +179,7 @@ evidence for asking.
 [s62]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md#62-path-valued-fields
 [s7]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md#7-actor-convention
 [s51]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md#51-provenance-sources
+[s52]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md#52-trust-generated-and-verified
 [s102]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md#102-contract-fields
 [s103]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md#103-the-computation
 [s9]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md#9-log-files

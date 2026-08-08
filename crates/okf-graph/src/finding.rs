@@ -89,6 +89,11 @@ pub enum Rule {
     /// delivers nothing (§10.3). A defect: like CONCEPT-8, the computation is
     /// the required core, and this one has none.
     EmptyComputation,
+    /// CONCEPT-12: a `generated.at` or `verified[].at` that is not an RFC 3339
+    /// datetime (§5.2). A defect: §5.2 states the type rather than suggesting
+    /// it, and §11's list of what a consumer must tolerate does not reach a
+    /// malformed one.
+    MalformedTimestamp,
 }
 
 impl Rule {
@@ -116,6 +121,7 @@ impl Rule {
             Rule::MalformedParameter => "CONCEPT-9",
             Rule::IncompleteAttestation => "CONCEPT-10",
             Rule::EmptyComputation => "CONCEPT-11",
+            Rule::MalformedTimestamp => "CONCEPT-12",
         }
     }
 
@@ -143,6 +149,7 @@ impl Rule {
             Rule::MalformedParameter => "malformed parameter",
             Rule::IncompleteAttestation => "incomplete attestation contract",
             Rule::EmptyComputation => "empty computation",
+            Rule::MalformedTimestamp => "malformed timestamp",
         }
     }
 
@@ -169,7 +176,8 @@ impl Rule {
             | Rule::InvalidComputationSource
             | Rule::IndexFrontmatter
             | Rule::NonIsoLogDate
-            | Rule::EmptyComputation => Severity::Defect,
+            | Rule::EmptyComputation
+            | Rule::MalformedTimestamp => Severity::Defect,
         }
     }
 }
@@ -219,7 +227,7 @@ impl fmt::Display for Finding {
 mod tests {
     use super::*;
 
-    const ALL: [Rule; 21] = [
+    const ALL: [Rule; 22] = [
         Rule::NotAConcept,
         Rule::MissingType,
         Rule::DuplicateId,
@@ -241,6 +249,7 @@ mod tests {
         Rule::MalformedParameter,
         Rule::IncompleteAttestation,
         Rule::EmptyComputation,
+        Rule::MalformedTimestamp,
     ];
 
     #[test]
@@ -276,6 +285,7 @@ mod tests {
             Rule::IndexFrontmatter,
             Rule::NonIsoLogDate,
             Rule::EmptyComputation,
+            Rule::MalformedTimestamp,
         ] {
             assert_eq!(rule.severity(), Severity::Defect, "{rule:?}");
         }

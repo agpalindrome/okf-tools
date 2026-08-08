@@ -17,7 +17,7 @@ use crate::links::{links_in, Link, LinkKind};
 use crate::log;
 use crate::paths::{classify_path, resolve_path, PathKind};
 use crate::provenance::{self, Derivation};
-use crate::{Concept, Finding, Rule};
+use crate::{Concept, Finding, Rule, Timestamp};
 
 /// A resolved body-link edge: the linking concept points at another concept in
 /// the same bundle (SPEC §6). A link that resolves to no concept is a dangling
@@ -463,6 +463,11 @@ fn check_concept(file: &str, concept: &Concept) -> Vec<Finding> {
         ));
     }
 
+    // CONCEPT-12: a declared `generated.at` must be an RFC 3339 datetime (§5.2).
+    if let Some(at) = fm.generated().and_then(|g| g.at) {
+        findings.extend(timestamp_finding(file, "generated.at", &at));
+    }
+
     // CONCEPT-4 / CONCEPT-5: a declared `generated` needs a `by` (§5.2), and it
     // must be a well-formed actor (§7).
     if fm.declares("generated") {
@@ -481,10 +486,14 @@ fn check_concept(file: &str, concept: &Concept) -> Vec<Finding> {
         }
     }
 
-    // CONCEPT-5: every `verified[].by` must be a well-formed actor (§7).
+    // CONCEPT-5 / CONCEPT-12: every `verified[]` event must carry a well-formed
+    // actor (§7) and an RFC 3339 `at` (§5.2).
     for (i, event) in fm.verified().iter().enumerate() {
         if let Some(by) = event.by.as_deref() {
             findings.extend(actor_finding(file, &format!("verified[{i}].by"), by));
+        }
+        if let Some(at) = event.at.as_deref() {
+            findings.extend(timestamp_finding(file, &format!("verified[{i}].at"), at));
         }
     }
 
@@ -626,6 +635,23 @@ fn actor_finding(file: &str, field: &str, value: &str) -> Option<Finding> {
         Rule::MalformedActor,
         format!("`{field}` = `{value}` is not a `producer/version` or `scheme:id` actor (SPEC §7)"),
     ))
+}
+
+/// A `CONCEPT-12` finding when `value` is present but not an RFC 3339 datetime.
+///
+/// The finding quotes the value, because the failure it exists for is a
+/// timestamp that looks right: `2026-W01-1T00:00:00Z` differs from the calendar
+/// form in one character and denotes a date eight days earlier.
+fn timestamp_finding(file: &str, field: &str, value: &str) -> Option<Finding> {
+    if Timestamp::parse(value).is_some() {
+        return None;
+    }
+    let detail = if value.trim().is_empty() {
+        format!("`{field}` is empty (SPEC §5.2)")
+    } else {
+        format!("`{field}` = `{value}` is not an RFC 3339 datetime (SPEC §5.2)")
+    };
+    Some(Finding::new(file, Rule::MalformedTimestamp, detail))
 }
 
 /// A well-formed actor (§7), read permissively (see [`actor_finding`]): a
