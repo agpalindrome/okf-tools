@@ -10,6 +10,7 @@ use std::collections::{BTreeMap, BTreeSet};
 /// a `sources[].resource` that resolves to a concept becomes one; an external
 /// URL, a scope descriptor, or a non-concept file is a leaf source, not an edge.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct Derivation {
     /// The deriving concept.
     pub from: String,

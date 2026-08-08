@@ -29,4 +29,13 @@ than a change to one.
 - An `okf-graph` binary: `okf-graph <bundle>` prints each finding and exits `0`
   with no defects, `1` with one or more, `2` on a usage or IO error.
 
+### Compatibility
+
+`Rule`, the frontmatter families, and the graph records are `#[non_exhaustive]`,
+so match a wildcard arm and do not build them with a struct literal. New rules
+and new spec fields then arrive as ordinary releases rather than as breaks —
+which is the expected shape of the work, since both the checks and OKF itself
+are still growing. `Severity` is exhaustive on purpose: it is §11's own binary,
+not a list that grows.
+
 [spec]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md

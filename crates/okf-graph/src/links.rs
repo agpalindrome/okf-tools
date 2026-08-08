@@ -17,6 +17,7 @@ use std::collections::BTreeMap;
 /// A markdown link found in a concept body, with its target as written (the
 /// `#fragment`, if any, is kept — stripping it belongs to resolution).
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct Link {
     /// The link target exactly as written.
     pub target: String,
@@ -26,6 +27,7 @@ pub struct Link {
 
 /// How a link target resolves. Only the first two can point at a concept.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum LinkKind {
     /// `/`-rooted: interpreted relative to the bundle root.
     BundleAbsolute,
