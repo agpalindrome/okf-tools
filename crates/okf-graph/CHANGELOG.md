@@ -7,6 +7,18 @@ may break the API, and an MSRV change is one of the things that earns it.
 
 ### Added
 
+- Rule **levels** a consumer sets: `Level` (`Allow` / `Report` / `Defect`),
+  `Policy`, `Rule::default_level`, `Rule::from_code`, `Rule::ALL`, and
+  `Bundle::findings_at` / `Bundle::fails`. The binary takes `--deny`, `--warn`,
+  and `--allow` over a rule code, last-wins, and counts what `--allow` dropped.
+  §11's tolerance is the right default for a consumer reading somebody else's
+  bundle and the wrong policy for a producer checking its own, so `--deny
+  BUNDLE-2` now fails on a dangling link without touching any other tolerated
+  rule. `Severity` is untouched and stays the spec's own verdict — a level is a
+  consumer's decision layered over it, never a re-reading of §11. Defaults come
+  from `Severity`, so a run that sets nothing behaves exactly as before. Named
+  in [#83](https://github.com/ojhermann-org/okf-tools/issues/83); the producer
+  rules that issue also proposes are not here.
 - `Frontmatter::declares`, `Frontmatter::scalar`, and
   `Frontmatter::executor_receipt_malformed` are public. The `Some`-only-on-shape
   readers conflate "absent" with "present but the wrong shape" on purpose, and

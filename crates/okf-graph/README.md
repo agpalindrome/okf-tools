@@ -58,7 +58,19 @@ nix run .#okf-graph -- crates/okf-graph/tests/fixtures/missing-type
 # A tolerated report → printed, but the run still passes (exit 0).
 nix run .#okf-graph -- crates/okf-graph/tests/fixtures/dangling
 # note.md  BUNDLE-2 (dangling link): link resolves to no concept in the bundle
+
+# Unless you own the bundle, in which case say so (exit 1).
+nix run .#okf-graph -- --deny BUNDLE-2 crates/okf-graph/tests/fixtures/dangling
 ```
+
+Those defaults are the spec's. §6 and §11 say a consumer MUST NOT reject a
+bundle over a dangling link, and a _report_ is that reading — it exists so a
+conformant bundle cannot be failed. A producer checking a bundle it owns in its
+own CI is not that consumer, so `--deny`, `--warn`, and `--allow` move one rule
+at a time by code, last-wins. What `--allow` hides is counted in the summary
+rather than vanishing. In the library the same thing is a `Policy`, read by
+`Bundle::findings_at` and `Bundle::fails`; `Severity` is untouched either way,
+because what the spec says is not a consumer's to configure.
 
 To gate bundles in another repo, take okf-tools as a flake input and put
 `okf-tools.packages.${system}.okf-graph` in a devShell or a CI step — that
