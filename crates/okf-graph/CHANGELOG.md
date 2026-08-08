@@ -3,10 +3,10 @@
 Notable changes to `okf-graph`, newest first. The crate is pre-1.0: a minor bump
 may break the API, and an MSRV change is one of the things that earns it.
 
-## Unreleased
+## 0.1.0 — 2026-08-08
 
-Nothing has been published yet, so everything below is the first release rather
-than a change to one.
+The first release. Everything below is what the crate is, rather than a change
+to something a reader already has.
 
 ### Added
 
