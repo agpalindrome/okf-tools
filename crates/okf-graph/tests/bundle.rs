@@ -110,7 +110,7 @@ fn a_dangling_link_is_reported_as_a_report_not_a_defect() {
         bundle
             .findings()
             .iter()
-            .all(|f| f.severity() == Severity::Report),
+            .all(|f| f.severity() == Some(Severity::Report)),
         "a dangling link must not be a defect"
     );
 }
@@ -152,7 +152,7 @@ fn a_malformed_date_is_a_defect_in_stale_after_and_a_report_in_a_signal() {
     let stale: Vec<_> = findings.iter().filter(|f| f.file == "stale.md").collect();
     assert_eq!(stale.len(), 1);
     assert_eq!(stale[0].rule, Rule::MalformedStaleAfter);
-    assert_eq!(stale[0].severity(), Severity::Defect);
+    assert_eq!(stale[0].severity(), Some(Severity::Defect));
     assert!(stale[0].detail.contains("2026-02-30"));
 
     // Every signal on the concept, each unreadable in its own way: a shared
@@ -163,7 +163,7 @@ fn a_malformed_date_is_a_defect_in_stale_after_and_a_report_in_a_signal() {
         .filter(|f| f.file == "signals.md")
         .inspect(|f| {
             assert_eq!(f.rule, Rule::MalformedSourceSignal);
-            assert_eq!(f.severity(), Severity::Report);
+            assert_eq!(f.severity(), Some(Severity::Report));
         })
         .map(|f| f.detail.as_str())
         .collect();
@@ -287,7 +287,7 @@ fn a_dangling_path_valued_field_is_a_report() {
     assert!(bundle
         .findings()
         .iter()
-        .all(|f| f.severity() == Severity::Report));
+        .all(|f| f.severity() == Some(Severity::Report)));
 }
 
 /// A `sources[].resource` that resolves to a concept is a derivation edge; the
@@ -317,7 +317,7 @@ fn a_derivation_cycle_is_reported() {
     assert_eq!(bundle.findings().len(), 1);
     let cycle = &bundle.findings()[0];
     assert_eq!(cycle.rule, Rule::DerivationCycle);
-    assert_eq!(cycle.severity(), Severity::Report);
+    assert_eq!(cycle.severity(), Some(Severity::Report));
     assert_eq!(cycle.file, "a.md");
     assert!(
         cycle.detail.contains("a → b → a"),
@@ -347,7 +347,7 @@ fn an_index_with_illegal_frontmatter_is_a_defect() {
 
     assert_eq!(bundle.findings().len(), 1);
     assert_eq!(bundle.findings()[0].rule, Rule::IndexFrontmatter);
-    assert_eq!(bundle.findings()[0].severity(), Severity::Defect);
+    assert_eq!(bundle.findings()[0].severity(), Some(Severity::Defect));
     assert_eq!(bundle.findings()[0].file, "index.md");
 }
 
@@ -359,7 +359,7 @@ fn a_dangling_index_entry_is_a_report() {
 
     assert_eq!(bundle.findings().len(), 1);
     assert_eq!(bundle.findings()[0].rule, Rule::DanglingIndexEntry);
-    assert_eq!(bundle.findings()[0].severity(), Severity::Report);
+    assert_eq!(bundle.findings()[0].severity(), Some(Severity::Report));
     assert_eq!(bundle.findings()[0].file, "index.md");
 }
 
@@ -381,7 +381,7 @@ fn a_non_iso_log_date_is_a_defect() {
 
     assert_eq!(bundle.findings().len(), 1);
     assert_eq!(bundle.findings()[0].rule, Rule::NonIsoLogDate);
-    assert_eq!(bundle.findings()[0].severity(), Severity::Defect);
+    assert_eq!(bundle.findings()[0].severity(), Some(Severity::Defect));
     assert_eq!(bundle.findings()[0].file, "log.md");
 }
 
@@ -393,7 +393,7 @@ fn an_out_of_order_log_is_a_report() {
 
     assert_eq!(bundle.findings().len(), 1);
     assert_eq!(bundle.findings()[0].rule, Rule::LogOutOfOrder);
-    assert_eq!(bundle.findings()[0].severity(), Severity::Report);
+    assert_eq!(bundle.findings()[0].severity(), Some(Severity::Report));
 }
 
 /// A log entry that resolves to nothing is LOG-3, a report (§6 tolerates it).
@@ -403,7 +403,7 @@ fn a_dangling_log_entry_is_a_report() {
 
     assert_eq!(bundle.findings().len(), 1);
     assert_eq!(bundle.findings()[0].rule, Rule::DanglingLogEntry);
-    assert_eq!(bundle.findings()[0].severity(), Severity::Report);
+    assert_eq!(bundle.findings()[0].severity(), Some(Severity::Report));
     assert_eq!(bundle.findings()[0].file, "log.md");
 }
 
@@ -430,7 +430,7 @@ fn a_malformed_parameter_is_reported() {
 
     assert_eq!(bundle.findings().len(), 1);
     assert_eq!(bundle.findings()[0].rule, Rule::MalformedParameter);
-    assert_eq!(bundle.findings()[0].severity(), Severity::Report);
+    assert_eq!(bundle.findings()[0].severity(), Some(Severity::Report));
     assert_eq!(bundle.findings()[0].file, "thing.md");
 }
 
@@ -447,7 +447,9 @@ fn an_incomplete_attestation_is_reported() {
         .collect();
     // executor no resource, executor receipt not a list, attester no resource.
     assert_eq!(incomplete.len(), 3);
-    assert!(incomplete.iter().all(|f| f.severity() == Severity::Report));
+    assert!(incomplete
+        .iter()
+        .all(|f| f.severity() == Some(Severity::Report)));
     assert_eq!(bundle.findings().len(), 3, "{:?}", bundle.findings());
 }
 
@@ -460,7 +462,7 @@ fn an_empty_computation_section_is_a_defect() {
 
     assert_eq!(bundle.findings().len(), 1);
     assert_eq!(bundle.findings()[0].rule, Rule::EmptyComputation);
-    assert_eq!(bundle.findings()[0].severity(), Severity::Defect);
+    assert_eq!(bundle.findings()[0].severity(), Some(Severity::Defect));
     assert_eq!(bundle.findings()[0].file, "thing.md");
 }
 
@@ -597,7 +599,7 @@ fn denying_a_rule_fails_the_run_without_touching_the_spec_severity() {
 
     assert!(bundle.fails(&policy));
     assert_eq!(bundle.findings_at(&policy).len(), 1);
-    assert_eq!(bundle.findings()[0].severity(), Severity::Report);
+    assert_eq!(bundle.findings()[0].severity(), Some(Severity::Report));
 }
 
 /// Allowing a rule drops it from `findings_at` while `findings` keeps every one

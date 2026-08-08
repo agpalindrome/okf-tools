@@ -26,6 +26,7 @@
 //! [`okf-normative`]: https://github.com/ojhermann-org/okf-tools
 
 mod bundle;
+mod check;
 mod concept;
 mod finding;
 mod index;
@@ -37,11 +38,12 @@ mod provenance;
 mod timestamp;
 
 pub use bundle::Bundle;
+pub use check::{Check, CheckError, Checks};
 pub use concept::{
     Attester, Body, Concept, ConceptError, Executor, Frontmatter, Generated, Parameter, Source,
     Status, UsageWindow, Verification,
 };
-pub use finding::{Finding, Rule, Severity};
+pub use finding::{Finding, Rule, RuleId, Severity};
 pub use links::{links_in, Link, LinkKind};
 pub use paths::{classify_path, resolve_path, PathKind};
 pub use policy::{Level, Policy};

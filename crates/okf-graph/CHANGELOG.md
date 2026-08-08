@@ -7,6 +7,15 @@ may break the API, and an MSRV change is one of the things that earns it.
 
 ### Added
 
+- **Caller-supplied checks**: a `Check` trait, a `Checks` set that verifies codes
+  are unique, and `Bundle::check`. A caller writes its own requirements — a house
+  key in every frontmatter, a `generated.at` §5.2 does not require — and
+  okf-graph runs them without learning what they are. The crate extends exactly
+  as far as the OKF spec and no further, so a house rule attaches here rather
+  than being argued into the rule set. A check's findings carry a
+  `RuleId::Custom` and take `Level`s like any other, and `Policy::for_checks`
+  seeds each one from the `default_level` the check declares. Named in
+  [#89](https://github.com/ojhermann-org/okf-tools/issues/89).
 - Rule **levels** a consumer sets: `Level` (`Allow` / `Report` / `Defect`),
   `Policy`, `Rule::default_level`, `Rule::from_code`, `Rule::ALL`, and
   `Bundle::findings_at` / `Bundle::fails`. The binary takes `--deny`, `--warn`,
@@ -32,6 +41,15 @@ may break the API, and an MSRV change is one of the things that earns it.
 
 ### Changed
 
+- **Breaking:** `Finding.rule` is a `RuleId` rather than a `Rule` — either
+  `Spec(Rule)`, the OKF list, or `Custom(Arc<str>)`, a caller's own code (#91).
+  `finding.rule == Rule::MissingType` still compiles, via `PartialEq<Rule>`.
+- **Breaking:** `Finding::severity` returns `Option<Severity>`. §11 has a verdict
+  on an OKF rule and none on a house rule, so a caller finding has no severity
+  rather than a defaulted one that would put words in the spec's mouth. What it
+  has instead is a `Level`, which is the question an exit code should be asking.
+- **Breaking:** `Policy::level` takes `&RuleId`, and `Policy::set` takes anything
+  `Into<RuleId>` — so existing `policy.set(Rule::DanglingLink, …)` is unchanged.
 - The licence is `MIT OR Apache-2.0` rather than Apache-2.0 alone, so a consumer
   chooses rather than inheriting the stricter of the two. 0.1.0 on crates.io
   stays Apache-2.0 — a published version is immutable — so the pair reaches the
