@@ -26,6 +26,10 @@ nix run .#okf-graph -- crates/okf-graph/tests/fixtures/clean
 nix run . -- crates/deon/examples/
 ```
 
+From another flake, `packages.<system>.okf-graph` is the validator on its own —
+what a devShell or a CI step wants, where an app cannot go. `packages.default`
+is the whole workspace, `deon-check` included.
+
 `nix flake check` — the single required check on `main` — builds the workspace,
 runs `cargo fmt --check` and `clippy -D warnings`, and tests every crate.
 
