@@ -33,4 +33,14 @@ is the whole workspace, `deon-check` included.
 `nix flake check` — the single required check on `main` — builds the workspace,
 runs `cargo fmt --check` and `clippy -D warnings`, and tests every crate.
 
+## License
+
+Licensed under either of [Apache License, Version 2.0](LICENSE-APACHE) or the
+[MIT license](LICENSE-MIT), at your option. A consumer picks one; nothing here
+requires both.
+
+Unless you state otherwise, a contribution you submit for inclusion in this
+work, as defined in Apache-2.0, is dual licensed as above with no additional
+terms.
+
 [okf]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md

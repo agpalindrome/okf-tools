@@ -3,6 +3,18 @@
 Notable changes to `okf-graph`, newest first. The crate is pre-1.0: a minor bump
 may break the API, and an MSRV change is one of the things that earns it.
 
+## Unreleased
+
+### Changed
+
+- The licence is `MIT OR Apache-2.0` rather than Apache-2.0 alone, so a consumer
+  chooses rather than inheriting the stricter of the two. 0.1.0 on crates.io
+  stays Apache-2.0 — a published version is immutable — so the pair reaches the
+  registry only with the next release.
+- `NOTICE` is gone. Under a dual licence its text was untrue for anyone electing
+  MIT, and keeping it would have handed Apache-2.0 §4(d)'s propagation duty to
+  every redistributor for no gain. Copyright attribution lives in `LICENSE-MIT`.
+
 ## 0.1.0 — 2026-08-08
 
 The first release. Everything below is what the crate is, rather than a change

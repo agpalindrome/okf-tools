@@ -76,6 +76,16 @@ authoritative for topology and identity. Where the OKF format fights the tools,
 the concrete cases are logged — with dates — in the [friction log][friction],
 raw material for an eventual upstream conversation.
 
+## License
+
+Licensed under either of [Apache License, Version 2.0](LICENSE-APACHE) or the
+[MIT license](LICENSE-MIT), at your option. A consumer picks one; nothing here
+requires both.
+
+Unless you state otherwise, a contribution you submit for inclusion in this
+work, as defined in Apache-2.0, is dual licensed as above with no additional
+terms.
+
 [design]: https://github.com/ojhermann-org/okf-tools/blob/main/docs/okf-graph-DESIGN.md
 [friction]: https://github.com/ojhermann-org/okf-tools/blob/main/docs/okf-friction.md
 [okf-spec]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md
