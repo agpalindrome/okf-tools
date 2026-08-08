@@ -138,6 +138,48 @@ fn generated_without_by_is_reported() {
     assert_eq!(bundle.findings()[0].file, "thing.md");
 }
 
+/// A `stale_after` that is not a real date is a CONCEPT-13 defect (§5.5), while
+/// the §5.1 credibility signals are CONCEPT-14 reports. The split is the spec's:
+/// §5.5 is a lifecycle field a consumer computes staleness from, and the signals
+/// are supporting evidence it weighs.
+#[test]
+fn a_malformed_date_is_a_defect_in_stale_after_and_a_report_in_a_signal() {
+    let bundle = Bundle::load(&fixture("bad-dates")).expect("loads");
+
+    let findings = bundle.findings();
+    assert_eq!(findings.len(), 5);
+
+    let stale: Vec<_> = findings.iter().filter(|f| f.file == "stale.md").collect();
+    assert_eq!(stale.len(), 1);
+    assert_eq!(stale[0].rule, Rule::MalformedStaleAfter);
+    assert_eq!(stale[0].severity(), Severity::Defect);
+    assert!(stale[0].detail.contains("2026-02-30"));
+
+    // Every signal on the concept, each unreadable in its own way: a shared
+    // window bound, a per-source bound, a non-integer count, and a date written
+    // the other way round.
+    let signals: Vec<&str> = findings
+        .iter()
+        .filter(|f| f.file == "signals.md")
+        .inspect(|f| {
+            assert_eq!(f.rule, Rule::MalformedSourceSignal);
+            assert_eq!(f.severity(), Severity::Report);
+        })
+        .map(|f| f.detail.as_str())
+        .collect();
+    assert_eq!(signals.len(), 4);
+    assert!(signals.iter().any(|d| d.contains("`usage_window.to`")));
+    assert!(signals
+        .iter()
+        .any(|d| d.contains("`sources[0].last_modified` = `30-05-2026`")));
+    assert!(signals
+        .iter()
+        .any(|d| d.contains("`sources[0].usage_count` is not an integer")));
+    assert!(signals
+        .iter()
+        .any(|d| d.contains("`sources[0].usage_window.to` = `2026-06-31`")));
+}
+
 /// An `at` that is ISO 8601 but not RFC 3339 is reported as CONCEPT-12 (§5.2),
 /// at both places §5.2 puts one. The week date is the case that motivates the
 /// rule: it passes every length-and-separator check a consumer is likely to

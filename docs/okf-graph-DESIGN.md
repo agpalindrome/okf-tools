@@ -118,8 +118,10 @@ families: `type` present and non-empty ([§11]); the field shapes of [§4.1]; th
 provenance, trust, and lifecycle families ([§5]) — a `sources` entry's required
 `resource`, the `verified` singleton that counts as one and not zero ([§5.2]),
 the actor convention ([§7]), the `at` timestamps read as RFC 3339 rather than as
-ISO 8601 entire (see the [friction log](okf-friction.md)), and `status` /
-`stale_after` ([§5.4], [§5.5]); and
+ISO 8601 entire (see the [friction log](okf-friction.md)), `status` /
+`stale_after` ([§5.4], [§5.5]), and the credibility signals a consumer computes
+with — `usage_count` an integer, `last_modified` and each `usage_window` bound a
+real `YYYY-MM-DD` day; and
 the Attested-Computation contract ([§10]) — `runtime`, typed `parameters`, and
 the computation-or-fence exclusivity ([§10.3]).
 

@@ -249,7 +249,10 @@ fn reads_lifecycle_status_and_stale_after() {
             .expect("parses");
 
     assert_eq!(concept.frontmatter().status(), Some(Status::Deprecated));
-    assert_eq!(concept.frontmatter().stale_after(), Some("2026-09-23"));
+    assert_eq!(
+        concept.frontmatter().stale_after().as_deref(),
+        Some("2026-09-23")
+    );
 }
 
 /// An unrecognised `status` reads as `None`, by the same shape rule as `tags`;
