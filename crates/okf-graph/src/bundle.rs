@@ -23,6 +23,7 @@ use crate::{Concept, Date, Finding, Rule, Timestamp, UsageWindow};
 /// the same bundle (SPEC §6). A link that resolves to no concept is a dangling
 /// `BUNDLE-2` report instead, and never an edge.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct BodyLink {
     /// Concept ID of the concept whose body carries the link.
     pub from: String,

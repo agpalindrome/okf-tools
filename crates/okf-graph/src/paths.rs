@@ -7,6 +7,7 @@
 
 /// How a path-valued field's value is interpreted (§6.2).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum PathKind {
     /// An absolute URL or protocol-relative reference — external, not resolved
     /// against the bundle.

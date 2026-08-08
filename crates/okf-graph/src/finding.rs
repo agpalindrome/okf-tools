@@ -10,6 +10,11 @@ use std::fmt;
 /// The split is the spec's: a dangling link or a missing optional family MUST
 /// NOT be rejected (SPEC §6, §11), so those are reports — printed, but they do
 /// not fail a run. Collapsing them into defects would fail a conformant bundle.
+///
+/// Deliberately **not** `#[non_exhaustive]`, unlike [`Rule`] and the frontmatter
+/// families. Those grow as checks and the spec do; this is §11's own binary —
+/// a bundle either conforms or it does not — so a caller matching both arms has
+/// covered the domain, and warning them otherwise would be false.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Severity {
     /// A conformance failure to fix.
@@ -22,6 +27,7 @@ pub enum Severity {
 /// `docs/okf-graph-DESIGN.md` §6: `CONCEPT-*` reads one document, `BUNDLE-*`
 /// reads the graph.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Rule {
     /// CONCEPT-1: a non-reserved `.md` that does not parse as a concept (§11).
     NotAConcept,
@@ -200,6 +206,7 @@ impl Rule {
 
 /// A located finding: the file it is about, the rule, and why.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct Finding {
     /// Bundle-relative path of the file the finding is about, e.g.
     /// `tables/orders.md`. A file rather than a Concept ID, because a file that

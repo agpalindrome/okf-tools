@@ -284,6 +284,7 @@ impl Frontmatter {
 /// A concept's lifecycle `status` (§5.4). Absent defaults to `Stable`, but that
 /// default is a consumer's to apply — see [`Frontmatter::status`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Status {
     /// Not yet reviewed; possibly incomplete.
     Draft,
@@ -299,6 +300,7 @@ pub enum Status {
 ///
 /// [`Timestamp::parse`]: crate::Timestamp::parse
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct Generated {
     /// The actor that produced the content (§7). Required by §5.2.
     pub by: Option<String>,
@@ -308,6 +310,7 @@ pub struct Generated {
 
 /// One `verified` event (§5.2): who confirmed the content, and when.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct Verification {
     /// The actor that confirmed the content (§7).
     pub by: Option<String>,
@@ -319,6 +322,7 @@ pub struct Verification {
 /// per-source credibility signals. `resource` is required by the spec, but is
 /// `Option` here so a missing one can be read and then reported.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct Source {
     /// A stable key used to attribute individual claims.
     pub id: Option<String>,
@@ -342,6 +346,7 @@ pub struct Source {
 
 /// The `{ from, to }` date range that frames a `usage_count` (§5.1).
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct UsageWindow {
     /// Start of the window (`YYYY-MM-DD`), as written.
     pub from: Option<String>,
@@ -385,6 +390,7 @@ fn usage_window(value: &Value) -> Option<UsageWindow> {
 /// `required` are all present in a well-formed entry; each is `Option` so a
 /// malformed one still reads.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct Parameter {
     /// The parameter's name — the hole an agent fills.
     pub name: Option<String>,
@@ -397,6 +403,7 @@ pub struct Parameter {
 
 /// How an Attested Computation is run (§10.2).
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct Executor {
     /// A path (§6.2) to the run instructions or code.
     pub resource: Option<String>,
@@ -406,6 +413,7 @@ pub struct Executor {
 
 /// The deterministic, consumer-side check of an Attested Computation (§10.2).
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct Attester {
     /// A path (§6.2) to the checker code (no LLM).
     pub resource: Option<String>,
@@ -547,6 +555,7 @@ impl Body {
 /// unknown key, or a broken link, and a checker cannot report on a document it
 /// refused to parse.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum ConceptError {
     /// The file does not open with a `---` fence.
     MissingFrontmatter,
