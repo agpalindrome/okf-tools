@@ -1,6 +1,9 @@
 [package]
 name = "okf-normative"
 description = "Semantic interpretation of the normative properties of an okf-graph"
+# A skeleton: the crate implements nothing yet, so publishing it would put an
+# empty name on the registry. Flip this when there is something to consume.
+publish = false
 version.workspace = true
 edition.workspace = true
 license.workspace = true

@@ -6,6 +6,11 @@ members = ["crates/okf-graph", "crates/okf-normative", "crates/deon"]
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
+# The support floor promised to consumers, and the version the nixpkgs-pinned
+# toolchain builds with — the only Rust this repo is ever tested against, so
+# claiming an older one would be a promise nothing checks. Clippy reads it too:
+# an unset `rust-version` makes lint behaviour drift with each toolchain bump.
+rust-version = "1.96"
 license = "Apache-2.0"
 repository = "https://github.com/ojhermann-org/okf-tools"
 

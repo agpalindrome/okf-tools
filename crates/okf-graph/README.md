@@ -38,7 +38,7 @@ says to tolerate — a dangling link, a missing optional family. OKF's consumpti
 model is permissive ([§11]), so a report is surfaced and printed but does not
 fail the run; only defects do. The full model — the edge kinds and why acyclicity
 is checked per kind, the defect/report cut, the deferred boundary — is in the
-[design note](../../docs/okf-graph-DESIGN.md).
+[design note][design].
 
 ## Run it
 
@@ -71,12 +71,13 @@ lints, and tests the workspace.
 
 ## Status
 
-Exploratory, structural-only, and built out. The design note
-([docs/okf-graph-DESIGN.md](../../docs/okf-graph-DESIGN.md)) is authoritative for
-topology and identity. Where the OKF format fights the tools, the concrete cases
-are logged — with dates — in the [friction log](../../docs/okf-friction.md), raw
-material for an eventual upstream conversation.
+Exploratory, structural-only, and built out. The [design note][design] is
+authoritative for topology and identity. Where the OKF format fights the tools,
+the concrete cases are logged — with dates — in the [friction log][friction],
+raw material for an eventual upstream conversation.
 
+[design]: https://github.com/ojhermann-org/okf-tools/blob/main/docs/okf-graph-DESIGN.md
+[friction]: https://github.com/ojhermann-org/okf-tools/blob/main/docs/okf-friction.md
 [okf-spec]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md
 [§4]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md#4-concept-documents
 [§5]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md#5-provenance-trust-and-lifecycle

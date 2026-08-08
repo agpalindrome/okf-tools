@@ -3,8 +3,14 @@ name = "okf-graph"
 description = "Topology and identity of an OKF Knowledge Bundle read as a knowledge graph"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
+# `LICENSE` and `NOTICE` are symlinks to the workspace root: cargo dereferences
+# them into the `.crate`, so a published copy carries the text Apache-2.0 §4
+# requires without a second copy in the tree to drift.
+keywords = ["okf", "knowledge-graph", "validator", "markdown", "metadata"]
+categories = ["development-tools", "parser-implementations", "command-line-utilities"]
 
 [dependencies]
 # Frontmatter is YAML, so a YAML parser is unavoidable. serde_yaml is archived
