@@ -61,3 +61,79 @@ fn no_arguments_exits_two() {
     let output = okf_graph().output().expect("runs");
     assert_eq!(output.status.code(), Some(2));
 }
+
+/// `--deny` on a tolerated rule is the producer's case: the `dangling` fixture
+/// passes by default and fails once `BUNDLE-2` is denied.
+#[test]
+fn denying_a_report_turns_a_passing_run_into_a_failing_one() {
+    let clean = okf_graph().arg(fixture("dangling")).output().expect("runs");
+    assert_eq!(clean.status.code(), Some(0));
+
+    let denied = okf_graph()
+        .args(["--deny", "BUNDLE-2"])
+        .arg(fixture("dangling"))
+        .output()
+        .expect("runs");
+    assert_eq!(denied.status.code(), Some(1));
+    assert!(String::from_utf8_lossy(&denied.stdout).contains("BUNDLE-2"));
+}
+
+/// `--allow` silences a rule, and the summary counts what it dropped rather
+/// than letting a silenced finding read as a rule that found nothing.
+#[test]
+fn allowing_a_rule_silences_it_and_the_summary_says_so() {
+    let output = okf_graph()
+        .args(["--allow", "BUNDLE-2"])
+        .arg(fixture("dangling"))
+        .output()
+        .expect("runs");
+
+    assert_eq!(output.status.code(), Some(0));
+    assert!(!String::from_utf8_lossy(&output.stdout).contains("BUNDLE-2"));
+    assert!(
+        String::from_utf8_lossy(&output.stderr).contains("1 silenced"),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+/// `--warn` takes a defect down to a report: still printed, no longer fatal.
+#[test]
+fn warning_a_defect_down_prints_it_and_exits_zero() {
+    let output = okf_graph()
+        .args(["--warn", "CONCEPT-2"])
+        .arg(fixture("missing-type"))
+        .output()
+        .expect("runs");
+
+    assert_eq!(output.status.code(), Some(0));
+    assert!(String::from_utf8_lossy(&output.stdout).contains("CONCEPT-2"));
+}
+
+/// A rule code is case-insensitive, and repeating one is last-wins.
+#[test]
+fn a_code_reads_in_any_case_and_the_last_setting_wins() {
+    let output = okf_graph()
+        .args(["--deny", "bundle-2", "--allow", "BUNDLE-2"])
+        .arg(fixture("dangling"))
+        .output()
+        .expect("runs");
+
+    assert_eq!(output.status.code(), Some(0));
+    assert!(!String::from_utf8_lossy(&output.stdout).contains("BUNDLE-2"));
+}
+
+/// A code no rule has is a usage error, not a silent no-op — a mistyped code
+/// that quietly does nothing looks exactly like one that worked.
+#[test]
+fn an_unknown_rule_code_exits_two() {
+    let output = okf_graph()
+        .args(["--deny", "BUNDEL-2"])
+        .arg(fixture("dangling"))
+        .output()
+        .expect("runs");
+    assert_eq!(output.status.code(), Some(2));
+
+    let missing = okf_graph().arg("--deny").output().expect("runs");
+    assert_eq!(missing.status.code(), Some(2));
+}

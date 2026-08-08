@@ -17,7 +17,7 @@ use crate::links::{links_in, Link, LinkKind};
 use crate::log;
 use crate::paths::{classify_path, resolve_path, PathKind};
 use crate::provenance::{self, Derivation};
-use crate::{Concept, Date, Finding, Rule, Timestamp, UsageWindow};
+use crate::{Concept, Date, Finding, Level, Policy, Rule, Timestamp, UsageWindow};
 
 /// A resolved body-link edge: the linking concept points at another concept in
 /// the same bundle (SPEC §6). A link that resolves to no concept is a dangling
@@ -126,9 +126,32 @@ impl Bundle {
             .collect()
     }
 
-    /// Every finding the load produced.
+    /// Every finding the load produced, at the spec's own severities.
     pub fn findings(&self) -> &[Finding] {
         &self.findings
+    }
+
+    /// The findings `policy` does not silence, in the order they were found.
+    ///
+    /// Filtering rather than skipping the work: every check runs during
+    /// [`load`], so a silenced rule costs nothing to have computed, and a
+    /// consumer that changes its mind about a level does not reload the bundle.
+    ///
+    /// [`load`]: Bundle::load
+    pub fn findings_at(&self, policy: &Policy) -> Vec<&Finding> {
+        self.findings
+            .iter()
+            .filter(|finding| policy.level(finding.rule) > Level::Allow)
+            .collect()
+    }
+
+    /// Whether the bundle fails under `policy` — whether any finding reaches
+    /// [`Level::Defect`]. This is the exit code's question, and the only one a
+    /// caller has to ask to gate on it.
+    pub fn fails(&self, policy: &Policy) -> bool {
+        self.findings
+            .iter()
+            .any(|finding| policy.level(finding.rule) == Level::Defect)
     }
 
     /// Number of concepts (reserved files excluded).

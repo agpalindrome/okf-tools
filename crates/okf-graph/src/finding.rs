@@ -26,7 +26,7 @@ pub enum Severity {
 /// Every rule a check can report. Codes follow the two levels of
 /// `docs/okf-graph-DESIGN.md` §6: `CONCEPT-*` reads one document, `BUNDLE-*`
 /// reads the graph.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum Rule {
     /// CONCEPT-1: a non-reserved `.md` that does not parse as a concept (§11).
@@ -113,6 +113,52 @@ pub enum Rule {
 }
 
 impl Rule {
+    /// Every rule. A slice rather than an array, so adding a rule does not
+    /// change the type a caller wrote down.
+    ///
+    /// The `#[non_exhaustive]` seal stops a consumer matching every variant; it
+    /// was never meant to stop one *listing* them, and naming a rule on a
+    /// command line needs the list.
+    pub const ALL: &'static [Rule] = &[
+        Rule::NotAConcept,
+        Rule::MissingType,
+        Rule::DuplicateId,
+        Rule::DanglingLink,
+        Rule::InvalidStatus,
+        Rule::MissingGeneratedBy,
+        Rule::MalformedActor,
+        Rule::MissingSourceResource,
+        Rule::MissingRuntime,
+        Rule::InvalidComputationSource,
+        Rule::DanglingPath,
+        Rule::DerivationCycle,
+        Rule::IndexFrontmatter,
+        Rule::DanglingIndexEntry,
+        Rule::UnknownOkfVersion,
+        Rule::NonIsoLogDate,
+        Rule::LogOutOfOrder,
+        Rule::DanglingLogEntry,
+        Rule::MalformedParameter,
+        Rule::IncompleteAttestation,
+        Rule::EmptyComputation,
+        Rule::MalformedTimestamp,
+        Rule::MalformedStaleAfter,
+        Rule::MalformedSourceSignal,
+    ];
+
+    /// The rule with this code, ASCII-case-insensitively — a code is typed by
+    /// hand, and `bundle-2` means what `BUNDLE-2` means.
+    ///
+    /// `None` for a code no rule has. A caller reports that rather than
+    /// ignoring it: a mistyped code that silently does nothing is worse than
+    /// having no way to name a rule at all, because it looks like it worked.
+    pub fn from_code(code: &str) -> Option<Rule> {
+        Rule::ALL
+            .iter()
+            .copied()
+            .find(|rule| rule.code().eq_ignore_ascii_case(code))
+    }
+
     /// Stable short code, e.g. `CONCEPT-1`.
     pub fn code(self) -> &'static str {
         match self {
@@ -250,40 +296,37 @@ impl fmt::Display for Finding {
 mod tests {
     use super::*;
 
-    const ALL: [Rule; 24] = [
-        Rule::NotAConcept,
-        Rule::MissingType,
-        Rule::DuplicateId,
-        Rule::DanglingLink,
-        Rule::InvalidStatus,
-        Rule::MissingGeneratedBy,
-        Rule::MalformedActor,
-        Rule::MissingSourceResource,
-        Rule::MissingRuntime,
-        Rule::InvalidComputationSource,
-        Rule::DanglingPath,
-        Rule::DerivationCycle,
-        Rule::IndexFrontmatter,
-        Rule::DanglingIndexEntry,
-        Rule::UnknownOkfVersion,
-        Rule::NonIsoLogDate,
-        Rule::LogOutOfOrder,
-        Rule::DanglingLogEntry,
-        Rule::MalformedParameter,
-        Rule::IncompleteAttestation,
-        Rule::EmptyComputation,
-        Rule::MalformedTimestamp,
-        Rule::MalformedStaleAfter,
-        Rule::MalformedSourceSignal,
-    ];
-
     #[test]
     fn every_rule_has_a_unique_code_and_a_title() {
         let mut codes = std::collections::BTreeSet::new();
-        for rule in ALL {
+        for rule in Rule::ALL.iter().copied() {
             assert!(!rule.title().is_empty(), "{rule:?} has no title");
             assert!(codes.insert(rule.code()), "duplicate code {}", rule.code());
         }
+    }
+
+    /// The load-bearing property of `ALL`: a rule left out of it is unreachable
+    /// by code, and this is what says so. `severity()`'s match is exhaustive, so
+    /// the compiler already forces a new rule to declare one — the list is the
+    /// part nothing else checks.
+    #[test]
+    fn every_rule_round_trips_through_its_code() {
+        for rule in Rule::ALL.iter().copied() {
+            assert_eq!(Rule::from_code(rule.code()), Some(rule), "{rule:?}");
+        }
+        assert_eq!(
+            Rule::ALL.len(),
+            24,
+            "a rule was added without a test update"
+        );
+    }
+
+    #[test]
+    fn a_code_reads_in_any_case_and_an_unknown_one_is_none() {
+        assert_eq!(Rule::from_code("bundle-2"), Some(Rule::DanglingLink));
+        assert_eq!(Rule::from_code("BUNDLE-2"), Some(Rule::DanglingLink));
+        assert_eq!(Rule::from_code("BUNDEL-2"), None);
+        assert_eq!(Rule::from_code(""), None);
     }
 
     #[test]

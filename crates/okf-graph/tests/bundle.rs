@@ -3,7 +3,7 @@
 
 use std::path::PathBuf;
 
-use okf_graph::{Bundle, Rule, Severity};
+use okf_graph::{Bundle, Level, Policy, Rule, Severity};
 
 fn fixture(name: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -573,4 +573,55 @@ fn a_path_field_naming_a_symlink_still_resolves() {
         "{:?}",
         bundle.findings()
     );
+}
+
+/// The `dangling` fixture is the issue's own case: a `BUNDLE-2` report, which
+/// §6/§11 say a consumer MUST NOT reject over, so the bundle does not fail.
+#[test]
+fn the_default_policy_is_the_spec_verdict() {
+    let bundle = Bundle::load(&fixture("dangling")).expect("loads");
+    let policy = Policy::new();
+
+    assert_eq!(bundle.findings_at(&policy).len(), 1);
+    assert!(!bundle.fails(&policy));
+}
+
+/// A producer checking a bundle it owns denies the one rule it cares about. The
+/// finding is unchanged — its `Severity` is still what the spec says — and only
+/// the run's verdict moves.
+#[test]
+fn denying_a_rule_fails_the_run_without_touching_the_spec_severity() {
+    let bundle = Bundle::load(&fixture("dangling")).expect("loads");
+    let mut policy = Policy::new();
+    policy.set(Rule::DanglingLink, Level::Defect);
+
+    assert!(bundle.fails(&policy));
+    assert_eq!(bundle.findings_at(&policy).len(), 1);
+    assert_eq!(bundle.findings()[0].severity(), Severity::Report);
+}
+
+/// Allowing a rule drops it from `findings_at` while `findings` keeps every one
+/// — so a caller can always see what a level hid from it.
+#[test]
+fn allowing_a_rule_hides_it_from_findings_at_only() {
+    let bundle = Bundle::load(&fixture("dangling")).expect("loads");
+    let mut policy = Policy::new();
+    policy.set(Rule::DanglingLink, Level::Allow);
+
+    assert!(bundle.findings_at(&policy).is_empty());
+    assert_eq!(bundle.findings().len(), 1);
+    assert!(!bundle.fails(&policy));
+}
+
+/// Warning down a defect is the other direction, and the one a consumer reading
+/// somebody else's bundle wants: keep going, but say what was found.
+#[test]
+fn warning_a_defect_down_keeps_it_visible_and_passes() {
+    let bundle = Bundle::load(&fixture("missing-type")).expect("loads");
+    let mut policy = Policy::new();
+    policy.set(Rule::MissingType, Level::Report);
+
+    assert!(bundle.fails(&Policy::new()));
+    assert!(!bundle.fails(&policy));
+    assert_eq!(bundle.findings_at(&policy).len(), 1);
 }
