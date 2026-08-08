@@ -58,6 +58,11 @@ nix run .#okf-graph -- crates/okf-graph/tests/fixtures/dangling
 # note.md  BUNDLE-2 (dangling link): link resolves to no concept in the bundle
 ```
 
+To gate bundles in another repo, take okf-tools as a flake input and put
+`okf-tools.packages.${system}.okf-graph` in a devShell or a CI step — that
+package is this binary alone. `packages.default` is the whole workspace and puts
+`deon-check` on PATH beside it.
+
 Every check ships with both a green case and a red fixture, because a checker
 you have only seen say "clean" is not a checker. `nix flake check` builds,
 lints, and tests the workspace.

@@ -59,6 +59,32 @@
           '';
         };
 
+      # Just the bundle validator, for a flake taking okf-tools as an *input*:
+      # an app cannot go in a devShell or buildInputs, and the workspace package
+      # puts `deon-check` on PATH too, under a pname naming neither the repo nor
+      # the tool asked for (#73).
+      #
+      # A symlink over the workspace build, not a second `buildRustPackage` with
+      # `-p okf-graph`: a separate build would recompile the shared crates and
+      # re-run the suite for no new coverage, and consumers would share no store
+      # path with `packages.default`. The workspace derivation stays a runtime
+      # dependency, so `deon-check` is still in the closure — off PATH, which is
+      # what the consumer was asking for.
+      okfGraphFor =
+        system:
+        let
+          pkgs = nixpkgs.legacyPackages.${system};
+          workspace = deonCheckFor system;
+        in
+        pkgs.runCommandLocal "okf-graph-0.1.0"
+          {
+            meta.mainProgram = "okf-graph";
+          }
+          ''
+            mkdir -p "$out/bin"
+            ln -s ${workspace}/bin/okf-graph "$out/bin/okf-graph"
+          '';
+
       # Fast, hermetic hygiene checks: Nix formatting/lint, markdown, and
       # whitespace. Mirrors Pacioli's hygiene set *minus* the Lean/nix-proof
       # gates (deon has no Lean yet); the Lean seam joins later.
@@ -100,16 +126,16 @@
     {
       packages = forAllSystems (system: {
         default = deonCheckFor system;
+        okf-graph = okfGraphFor system;
       });
 
-      # `nix run .#okf-graph -- <bundle>` runs the structural validator. The
-      # workspace build (deonCheckFor) already installs both binaries, so this
-      # points at its `bin/okf-graph`; `nix run .` stays `deon-check` via
-      # packages.default, leaving CLAUDE.md's documented invocation untouched.
+      # `nix run .#okf-graph -- <bundle>` runs the structural validator; `nix
+      # run .` stays `deon-check` via packages.default, leaving CLAUDE.md's
+      # documented invocation untouched.
       apps = forAllSystems (system: {
         okf-graph = {
           type = "app";
-          program = "${deonCheckFor system}/bin/okf-graph";
+          program = "${okfGraphFor system}/bin/okf-graph";
         };
       });
 
