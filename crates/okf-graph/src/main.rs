@@ -104,7 +104,7 @@ fn main() -> ExitCode {
 
     let defects = findings
         .iter()
-        .filter(|f| policy.level(f.rule) == Level::Defect)
+        .filter(|f| policy.level(&f.rule) == Level::Defect)
         .count();
     let reports = findings.len() - defects;
     // What `--allow` dropped. Printed whenever it is non-zero: a run that

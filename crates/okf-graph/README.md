@@ -72,6 +72,40 @@ rather than vanishing. In the library the same thing is a `Policy`, read by
 `Bundle::findings_at` and `Bundle::fails`; `Severity` is untouched either way,
 because what the spec says is not a consumer's to configure.
 
+## Your own rules
+
+Levels move a rule okf-graph already has. For a requirement the spec does not
+make — a house key in every frontmatter, a `generated.at` where §5.2 asks only
+for `by` — write a `Check` and hand it over. The crate runs it and never learns
+what it is:
+
+```rust
+impl Check for GeneratedAtRequired {
+    fn code(&self) -> &str { "HOUSE-1" }
+    fn check(&self, _id: &str, concept: &Concept) -> Result<(), String> {
+        match concept.frontmatter().generated() {
+            Some(g) if g.at.is_some() => Ok(()),
+            _ => Err("no `generated.at`".into()),
+        }
+    }
+}
+
+let mut checks = Checks::new();
+checks.add(GeneratedAtRequired)?;
+let findings = bundle.check(&checks);
+```
+
+The findings are ordinary `Finding`s carrying a `RuleId::Custom`, so they take
+levels through the same `Policy` — `Policy::for_checks` seeds each from the
+check's own `default_level`. They print without a rule title (`note.md HOUSE-1:
+…`), which is how a reader tells your rule from the spec's at a glance, and
+`Finding::severity` is `None` for them: §11 has no verdict on a house rule.
+
+This is where the boundary is drawn. **okf-graph extends exactly as far as the
+OKF spec**; what you additionally want is yours to state and yours to own. The
+normative reading of a Bundle's content is `okf-normative`'s, not this crate's
+and not a check's.
+
 To gate bundles in another repo, take okf-tools as a flake input and put
 `okf-tools.packages.${system}.okf-graph` in a devShell or a CI step — that
 package is this binary alone. `packages.default` is the whole workspace and puts

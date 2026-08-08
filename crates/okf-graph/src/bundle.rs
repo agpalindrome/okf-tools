@@ -17,7 +17,7 @@ use crate::links::{links_in, Link, LinkKind};
 use crate::log;
 use crate::paths::{classify_path, resolve_path, PathKind};
 use crate::provenance::{self, Derivation};
-use crate::{Concept, Date, Finding, Level, Policy, Rule, Timestamp, UsageWindow};
+use crate::{Checks, Concept, Date, Finding, Level, Policy, Rule, RuleId, Timestamp, UsageWindow};
 
 /// A resolved body-link edge: the linking concept points at another concept in
 /// the same bundle (SPEC §6). A link that resolves to no concept is a dangling
@@ -141,8 +141,40 @@ impl Bundle {
     pub fn findings_at(&self, policy: &Policy) -> Vec<&Finding> {
         self.findings
             .iter()
-            .filter(|finding| policy.level(finding.rule) > Level::Allow)
+            .filter(|finding| policy.level(&finding.rule) > Level::Allow)
             .collect()
+    }
+
+    /// Run a caller's own [`Checks`] over every concept, newly.
+    ///
+    /// Separate from [`findings`] rather than folded into it: these are house
+    /// rules, not OKF's, and the crate never learns what they are. A caller
+    /// combines the two lists — they share [`Finding`] and flow through the same
+    /// [`Policy`] — with [`RuleId::spec`] telling them apart where it matters.
+    ///
+    /// Post-hoc rather than during [`load`], so one loaded bundle can be checked
+    /// under several sets and `Bundle` stays immutable.
+    ///
+    /// A check that panics panics here. That is a bug in the caller's check, and
+    /// catching it would dress it up as a defective bundle.
+    ///
+    /// [`findings`]: Bundle::findings
+    /// [`load`]: Bundle::load
+    /// [`RuleId::spec`]: crate::RuleId::spec
+    pub fn check(&self, checks: &Checks) -> Vec<Finding> {
+        let mut findings = Vec::new();
+        for (id, concept) in self.concepts() {
+            for (code, check) in checks.iter() {
+                if let Err(detail) = check.check(id, concept) {
+                    findings.push(Finding::new(
+                        format!("{id}.md"),
+                        RuleId::Custom(code.clone()),
+                        detail,
+                    ));
+                }
+            }
+        }
+        findings
     }
 
     /// Whether the bundle fails under `policy` — whether any finding reaches
@@ -151,7 +183,7 @@ impl Bundle {
     pub fn fails(&self, policy: &Policy) -> bool {
         self.findings
             .iter()
-            .any(|finding| policy.level(finding.rule) == Level::Defect)
+            .any(|finding| policy.level(&finding.rule) == Level::Defect)
     }
 
     /// Number of concepts (reserved files excluded).

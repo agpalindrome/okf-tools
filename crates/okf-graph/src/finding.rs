@@ -3,6 +3,7 @@
 //! archived crate; the rationale is `docs/okf-graph-DESIGN.md` §5.
 
 use std::fmt;
+use std::sync::Arc;
 
 /// Whether a finding is a **defect** to fix or a **report** about something the
 /// spec says to tolerate.
@@ -250,6 +251,65 @@ impl Rule {
     }
 }
 
+/// Which rule a finding is about: one of the spec's, or one a caller brought.
+///
+/// The two halves are deliberately distinguishable. [`Rule`] is and stays the
+/// OKF list — sealed, complete, and the crate's whole remit. A caller's rule is
+/// a house rule this crate knows nothing about beyond its code, and a reader of
+/// the output should be able to tell which kind fired without consulting
+/// anything.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum RuleId {
+    /// A rule from the OKF spec.
+    Spec(Rule),
+    /// A caller's own rule, named by its code. `Arc<str>` rather than
+    /// `&'static str` because a caller may compute a code — one rule per
+    /// required frontmatter key is the shape that motivated caller checks in the
+    /// first place — and rather than `String` because a `Finding` is cloned per
+    /// concept over a whole bundle (#91).
+    Custom(Arc<str>),
+}
+
+impl RuleId {
+    /// The rule's code: the spec's own, or the caller's.
+    pub fn code(&self) -> &str {
+        match self {
+            RuleId::Spec(rule) => rule.code(),
+            RuleId::Custom(code) => code,
+        }
+    }
+
+    /// The spec rule this names, or `None` for a caller's.
+    pub fn spec(&self) -> Option<Rule> {
+        match self {
+            RuleId::Spec(rule) => Some(*rule),
+            RuleId::Custom(_) => None,
+        }
+    }
+}
+
+impl From<Rule> for RuleId {
+    fn from(rule: Rule) -> RuleId {
+        RuleId::Spec(rule)
+    }
+}
+
+/// `finding.rule == Rule::MissingType` reads the obvious way, without the caller
+/// wrapping the right-hand side or matching to get at it. A caller's rule is
+/// never equal to a spec rule, which is the answer that keeps the seam honest.
+impl PartialEq<Rule> for RuleId {
+    fn eq(&self, other: &Rule) -> bool {
+        matches!(self, RuleId::Spec(rule) if rule == other)
+    }
+}
+
+impl PartialEq<RuleId> for Rule {
+    fn eq(&self, other: &RuleId) -> bool {
+        other == self
+    }
+}
+
 /// A located finding: the file it is about, the rule, and why.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
@@ -259,36 +319,54 @@ pub struct Finding {
     /// fails to parse (`CONCEPT-1`) has no id to name.
     pub file: String,
     /// Which rule tripped.
-    pub rule: Rule,
+    pub rule: RuleId,
     /// One-line explanation.
     pub detail: String,
 }
 
 impl Finding {
-    pub(crate) fn new(file: impl Into<String>, rule: Rule, detail: impl Into<String>) -> Self {
+    pub(crate) fn new(
+        file: impl Into<String>,
+        rule: impl Into<RuleId>,
+        detail: impl Into<String>,
+    ) -> Self {
         Finding {
             file: file.into(),
-            rule,
+            rule: rule.into(),
             detail: detail.into(),
         }
     }
 
-    /// The finding's severity, from its rule.
-    pub fn severity(&self) -> Severity {
-        self.rule.severity()
+    /// The finding's severity, or `None` when a caller's rule tripped.
+    ///
+    /// `Severity` is §11's verdict on a bundle, and §11 has no opinion about a
+    /// house rule — so a caller finding has no severity rather than a defaulted
+    /// one. What it has instead is a [`Level`], which is the consumer's own
+    /// question and the one an exit code should be reading.
+    ///
+    /// [`Level`]: crate::Level
+    pub fn severity(&self) -> Option<Severity> {
+        self.rule.spec().map(Rule::severity)
     }
 }
 
 impl fmt::Display for Finding {
+    /// A spec finding names its rule, `path CONCEPT-2 (missing type): …`; a
+    /// caller's prints the code alone, `path TV-1: …`. The asymmetry is the
+    /// point — the crate has no title for a rule it did not write, and the
+    /// shorter line tells a reader at a glance whose rule fired.
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "{}\t{} ({}): {}",
-            self.file,
-            self.rule.code(),
-            self.rule.title(),
-            self.detail
-        )
+        match &self.rule {
+            RuleId::Spec(rule) => write!(
+                f,
+                "{}\t{} ({}): {}",
+                self.file,
+                rule.code(),
+                rule.title(),
+                self.detail
+            ),
+            RuleId::Custom(code) => write!(f, "{}\t{}: {}", self.file, code, self.detail),
+        }
     }
 }
 
@@ -368,6 +446,6 @@ mod tests {
             finding.to_string(),
             "tables/orders.md\tCONCEPT-2 (missing type): no `type`"
         );
-        assert_eq!(finding.severity(), Severity::Defect);
+        assert_eq!(finding.severity(), Some(Severity::Defect));
     }
 }
