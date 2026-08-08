@@ -4,7 +4,7 @@ members = ["crates/okf-graph", "crates/okf-normative", "crates/deon"]
 
 # Shared across every crate here. Individual crates set their own `description`.
 [workspace.package]
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 # The support floor promised to consumers, and the version the nixpkgs-pinned
 # toolchain builds with — the only Rust this repo is ever tested against, so
@@ -15,7 +15,7 @@ license = "MIT OR Apache-2.0"
 repository = "https://github.com/ojhermann-org/okf-tools"
 
 [workspace.dependencies]
-okf-graph = { path = "crates/okf-graph", version = "0.1.0" }
+okf-graph = { path = "crates/okf-graph", version = "0.2.0" }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
