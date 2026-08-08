@@ -12,6 +12,11 @@
 # is why this wraps `infisical run` rather than expecting `cargo login` to have
 # written a token to ~/.cargo/credentials.toml. Nothing here prints it.
 #
+# The Infisical project is named by `INFISICAL_PROJECT_ID` from the environment,
+# and deliberately not committed: this repo is public, and whether an internal
+# identifier belongs in it is the owner's call, not a script's. Set it in the
+# untracked local `.envrc`, which is where machine-local values already live.
+#
 # Guards, each one a failure that is annoying to diagnose after the fact:
 #   - the working tree is clean, and HEAD is the default branch at its remote tip
 #   - the version is not already on crates.io (a re-publish is a hard 403)
@@ -93,6 +98,13 @@ if [ -f "$CHANGELOG" ] && ! grep -q "^## $VERSION" "$CHANGELOG"; then
   exit 1
 fi
 
+if [ "$DRY" -eq 0 ] && [ -z "${INFISICAL_PROJECT_ID:-}" ]; then
+  echo "error: INFISICAL_PROJECT_ID is not set — the Infisical CLI cannot find" >&2
+  echo "       the project. Add it to the untracked local .envrc:" >&2
+  echo "         export INFISICAL_PROJECT_ID=<id>   # then: direnv allow" >&2
+  exit 1
+fi
+
 TAG="$CRATE-v$VERSION"
 if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
   echo "error: tag '$TAG' already exists" >&2
@@ -108,7 +120,8 @@ fi
 
 # `infisical run` injects CARGO_REGISTRY_TOKEN into cargo's environment. The
 # token is never echoed, and never lands in ~/.cargo/credentials.toml.
-infisical run --env=dev --path=/shared -- cargo publish -p "$CRATE"
+infisical run --projectId "$INFISICAL_PROJECT_ID" --env=dev --path=/shared \
+  -- cargo publish -p "$CRATE"
 
 echo "tagging $TAG"
 git tag -a "$TAG" -m "$CRATE $VERSION"
