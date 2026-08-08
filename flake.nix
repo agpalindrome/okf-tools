@@ -115,6 +115,10 @@
                   code_blocks = false;
                 };
                 MD033 = false; # inline HTML
+                # duplicate headings, restricted to siblings: a CHANGELOG repeats
+                # `### Added` under every release, and that repetition is the
+                # format rather than a mistake.
+                MD024.siblings_only = true;
                 MD036 = false; # emphasis-as-heading — prose uses emphasis stylistically
                 MD040 = false; # fenced code language not required (grammar blocks)
                 MD025.front_matter_title = ""; # OKF norm files carry a YAML front-matter title

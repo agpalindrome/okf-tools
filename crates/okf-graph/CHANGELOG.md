@@ -5,6 +5,19 @@ may break the API, and an MSRV change is one of the things that earns it.
 
 ## Unreleased
 
+### Added
+
+- `Frontmatter::declares`, `Frontmatter::scalar`, and
+  `Frontmatter::executor_receipt_malformed` are public. The `Some`-only-on-shape
+  readers conflate "absent" with "present but the wrong shape" on purpose, and
+  the methods that told them apart were `pub(crate)` — so a check inside the
+  crate could make the distinction the type is designed around and a consumer
+  could not. `declares` answers whether the key was written at all; `scalar`
+  renders the value as the document wrote it, which separates `status:
+  provisional` (an unmodelled lifecycle stage) from `status: true` (a value
+  nothing can read) where `declares` alone reports both alike. Named in
+  [#84](https://github.com/ojhermann-org/okf-tools/issues/84).
+
 ### Changed
 
 - The licence is `MIT OR Apache-2.0` rather than Apache-2.0 alone, so a consumer

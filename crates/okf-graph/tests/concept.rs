@@ -230,8 +230,8 @@ fn a_tag_list_with_a_non_string_reads_as_absent() {
     assert_eq!(concept.frontmatter().tags(), None);
 }
 
-/// Any field of the wrong shape reads as absent, by the same rule. Telling the
-/// two apart is a conformance check's job, over frontmatter kept whole here.
+/// Any field of the wrong shape reads as absent, by the same rule — and
+/// `declares` is what tells the two apart.
 #[test]
 fn a_field_of_the_wrong_shape_reads_as_absent() {
     let concept = Concept::parse("---\ntype: 42\ntitle: Answers\n---\n").expect("parses");
@@ -255,12 +255,72 @@ fn reads_lifecycle_status_and_stale_after() {
     );
 }
 
-/// An unrecognised `status` reads as `None`, by the same shape rule as `tags`;
-/// telling that from absent (both `None`) is a conformance check's job.
+/// An unrecognised `status` reads as `None`, by the same shape rule as `tags`.
 #[test]
 fn an_unrecognised_status_reads_as_none() {
     let concept = Concept::parse("---\ntype: Reference\nstatus: archived\n---\n").expect("parses");
     assert_eq!(concept.frontmatter().status(), None);
+}
+
+/// `declares` recovers what the `Some`-on-shape readers drop: whether the
+/// document wrote the key at all. Both concepts here read `status() == None`.
+#[test]
+fn declares_tells_absent_from_present_but_unreadable() {
+    let absent = Concept::parse("---\ntype: Reference\n---\n").expect("parses");
+    let present = Concept::parse("---\ntype: Reference\nstatus: true\n---\n").expect("parses");
+
+    assert_eq!(absent.frontmatter().status(), None);
+    assert_eq!(present.frontmatter().status(), None);
+
+    assert!(!absent.frontmatter().declares("status"));
+    assert!(present.frontmatter().declares("status"));
+}
+
+/// `declares` alone does not separate the two ways a `status` fails, and they
+/// want different fixes: `provisional` is an unmodelled lifecycle stage, `true`
+/// is a value nothing can read. `scalar` is what tells them apart.
+#[test]
+fn scalar_separates_an_unmodelled_stage_from_an_unreadable_value() {
+    let stage = Concept::parse("---\ntype: Reference\nstatus: provisional\n---\n").expect("parses");
+    let unreadable = Concept::parse("---\ntype: Reference\nstatus: true\n---\n").expect("parses");
+
+    assert_eq!(stage.frontmatter().status(), None);
+    assert_eq!(unreadable.frontmatter().status(), None);
+    assert!(stage.frontmatter().declares("status"));
+    assert!(unreadable.frontmatter().declares("status"));
+
+    assert_eq!(
+        stage.frontmatter().scalar("status").as_deref(),
+        Some("provisional")
+    );
+    assert_eq!(
+        unreadable.frontmatter().scalar("status").as_deref(),
+        Some("true")
+    );
+}
+
+/// A collection has no scalar rendering, so `scalar` is `None` there exactly as
+/// it is for an absent key — which is why the two compose rather than one
+/// replacing the other.
+#[test]
+fn a_collection_has_no_scalar_and_declares_is_what_finds_it() {
+    let concept =
+        Concept::parse("---\ntype: Reference\nstatus: [draft, stable]\n---\n").expect("parses");
+
+    assert_eq!(concept.frontmatter().scalar("status"), None);
+    assert!(concept.frontmatter().declares("status"));
+    assert_eq!(concept.frontmatter().scalar("nothing_here"), None);
+    assert!(!concept.frontmatter().declares("nothing_here"));
+}
+
+/// An explicit null is a key the document wrote, so it reads as `""` rather
+/// than as absent — the one case where `scalar` alone answers the question.
+#[test]
+fn an_explicit_null_reads_as_an_empty_scalar() {
+    let concept = Concept::parse("---\ntype: Reference\nstatus:\n---\n").expect("parses");
+
+    assert_eq!(concept.frontmatter().scalar("status").as_deref(), Some(""));
+    assert!(concept.frontmatter().declares("status"));
 }
 
 /// An absent lifecycle family is `None` — not an error, and not defaulted here.
@@ -391,6 +451,7 @@ attester:
         Some("references/skills/run-on-bq.md")
     );
     assert_eq!(executor.receipt, ["job_id", "executed_sql", "result"]);
+    assert!(!front.executor_receipt_malformed());
 
     let attester = front.attester().expect("attester");
     assert_eq!(
@@ -436,6 +497,35 @@ fn an_empty_computation_section_is_detected() {
 
     let none = Concept::parse("---\ntype: Reference\n---\n# Schema\n").expect("parses");
     assert!(!none.body().has_empty_computation_section());
+}
+
+/// A nested key is out of `declares`'s reach — `executor.receipt` is optional,
+/// so absent and present-but-not-a-list-of-strings both read as an empty `Vec`.
+/// `executor_receipt_malformed` is the one nested question answered directly.
+#[test]
+fn a_malformed_executor_receipt_is_reachable_from_outside() {
+    let malformed =
+        Concept::parse("---\ntype: Attested Computation\nexecutor:\n  receipt: job_id\n---\n")
+            .expect("parses");
+    let absent =
+        Concept::parse("---\ntype: Attested Computation\nexecutor:\n  resource: r.md\n---\n")
+            .expect("parses");
+
+    assert!(malformed
+        .frontmatter()
+        .executor()
+        .expect("executor")
+        .receipt
+        .is_empty());
+    assert!(absent
+        .frontmatter()
+        .executor()
+        .expect("executor")
+        .receipt
+        .is_empty());
+
+    assert!(malformed.frontmatter().executor_receipt_malformed());
+    assert!(!absent.frontmatter().executor_receipt_malformed());
 }
 
 /// A CRLF file splits like any other: the fences tolerate the carriage return.
