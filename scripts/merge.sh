@@ -14,12 +14,16 @@
 # gate (owner review -> queue). The auto-mode classifier blocks an *unsolicited*
 # agent self-merge, exactly as it blocks --admin — but the agent MAY run this
 # when the owner explicitly asks it to merge a specific PR (standing grant in
-# ~/.claude/CLAUDE.md, Pull-requests -> the deon carve-out, mirroring pacioli).
+# ~/.claude/CLAUDE.md, Repo rights -> Where a repo differs, where okf-tools
+# shares an entry with pacioli).
 #
-# By default it refuses unless the PR's required checks are all green; pass
-# --force to override. NOTE: deon has no CI yet, so there are no checks to
-# report — until a required check exists, `gh pr checks` sees none and this
-# guard refuses without --force. --force stays owner-run/confirm-first.
+# Unless --force is passed, it refuses when `gh pr checks` exits non-zero. The
+# required check here is `nix flake check`. Observed on PR #96 (2026-08-11):
+# the guard passed on a green run, --force was not needed, and a non-required
+# [code]smith check sitting in `skipping` did not hold it back. What `gh pr
+# checks` does on a PR with no checks at all is untested — the claim this
+# header used to make about that is what went stale, so it is not replaced with
+# another. --force stays owner-run/confirm-first.
 #
 # Usage: scripts/merge.sh <pr-number> [--force]
 #
