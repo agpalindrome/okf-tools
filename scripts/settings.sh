@@ -27,13 +27,25 @@ REPO="$(gh repo view --json nameWithOwner --jq .nameWithOwner)"
 NAME="$(jq -r .name "$RULESET_FILE")"
 
 # The fields that define the ruleset; server-added metadata (id, timestamps,
-# _links, source) is dropped so the diff shows only meaningful drift. `rules` is
-# sorted by type because GitHub re-canonicalizes rule order on every PUT (a
-# newly-added rule lands last), so a positional diff would report that reordering
-# as spurious drift even when the content matches exactly.
+# _links, source) is dropped so the diff shows only meaningful drift.
+#
+# Array order is not compared, at any depth. GitHub re-canonicalizes it on every
+# PUT — a newly-added rule lands last — so a positional diff reports that
+# reordering as spurious drift even when the content matches exactly. `rules`
+# was already sorted by type for that reason, but only `rules`: the walk() below
+# extends the same treatment to bypass_actors, required status checks and
+# allowed merge methods, which are the same shape and would have bitten next
+# (observed 2026-08-11 on ojhermann-org/agpalindrome-aws, where a rule written
+# anywhere but last cost a second PR to correct). `-S` sorts object keys; both
+# sides of the diff go through this.
+#
+# The cost, stated plainly: if GitHub ever gives an array in a ruleset a meaning
+# that depends on its order, this diff will not see a change to it. Nothing in
+# the current schema is known to work that way — rules all apply and none is
+# first-match — but that is reasoning about the schema, not a guarantee from it.
 normalize() {
-  jq -S '{name, target, enforcement, bypass_actors, conditions,
-          rules: (.rules | sort_by(.type))}'
+  jq -S '{name, target, enforcement, bypass_actors, conditions, rules}
+         | walk(if type == "array" then sort else . end)'
 }
 
 existing_id() {
