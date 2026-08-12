@@ -154,15 +154,37 @@ not. Say what has to be said, as succinctly as it can be said.
 
 ## Landing changes
 
-- `main` is **PR-only** and branch-protected (required owner review + merge
-  queue). `scripts/merge.sh <pr>` lands an owner-authored PR via ruleset
-  bypass — the agent runs it **only on the owner's explicit ask for that PR**.
-  Asking for a task is not an ask to merge the PRs the task produces; the
-  required review is exactly the gate the bypass removes. This applies to any
-  sub-agent you brief, which will act on whatever authority your brief claims
-  for it.
-- `merge.sh` gates on green CI, so no `--force` is needed; **`--force` stays
-  owner-run/confirm-first.**
+- `main` is **PR-only**: one approving code-owner review, `nix flake check`
+  green, squash-only, through the merge queue. `.github/CODEOWNERS` names both
+  of the org's owner accounts, so a pull request opened by one is approvable by
+  the other and **nothing here bypasses a ruleset any more**. Read that file's
+  comment before treating the approval as review: two accounts held by one
+  operator is a second credential, not a second reviewer.
+- **Merging is still the owner's explicit ask for that pull request.** Asking
+  for a task is not an ask to land the pull requests the task produces. That
+  rule outlived the bypass it was written for — the gate is now a real review
+  rather than an authority to skip one, and an agent still does not approve its
+  own work. This applies to any sub-agent you brief, which will act on whatever
+  authority your brief claims for it.
+- **Enqueue with the GraphQL mutation**, because both `gh pr merge` shapes fail
+  against this repo's settings:
+
+  ```sh
+  gh api graphql -f query='mutation($id:ID!){enqueuePullRequest(input:{pullRequestId:$id}){mergeQueueEntry{position state}}}' \
+    -F id="$(gh pr view <pr> --json id --jq .id)"
+  ```
+
+  `gh pr merge <pr> --delete-branch` is refused before any request goes out
+  whenever a merge queue is enabled, and it is redundant regardless, because
+  `delete_branch_on_merge` is on. Plain `gh pr merge <pr>` routes a
+  queue-required merge through `enablePullRequestAutoMerge`, which this repo
+  refuses: `allow_auto_merge` is `false`. Both are properties of the settings
+  rather than of the command, so re-read the settings before believing this
+  paragraph:
+
+  ```sh
+  gh api repos/{owner}/{repo} --jq '{allow_auto_merge, delete_branch_on_merge}'
+  ```
 
 ## Deletion & creation
 
