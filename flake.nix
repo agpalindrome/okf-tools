@@ -92,6 +92,32 @@
         system:
         git-hooks.lib.${system}.run {
           src = ./.;
+          # `prek` rather than the default `pkgs.pre-commit`, for the shape of
+          # the hook the driver installs into `.git/hooks/` (#98).
+          #
+          # That file is generated and untracked, so it cannot be repaired by
+          # editing it, and pre-commit's template — as nixpkgs patches it —
+          # pins a store path on the shebang line and execs a second one,
+          # guarding neither. git-hooks.nix roots the hook *entries*, by making
+          # `.pre-commit-config.yaml` an indirect gc root; nothing roots the
+          # driver or that bash. Collect the shebang and `git commit` fails as
+          # `cannot exec '.git/hooks/pre-commit': No such file or directory`,
+          # about a file that is present and executable — the interpreter on
+          # its first line is what went missing, and the message never says so.
+          # prek pins its path too, but takes `#!/bin/sh` and guards the pin
+          # with a test that falls back to PATH, which the dev shell already
+          # populates from `enabledPackages`.
+          #
+          # This is the reversal of the guard-the-generated-file approach #99
+          # took. What that PR weighed against prek was this: `checks.pre-commit`
+          # runs the hook set through the driver, so swapping the driver changes
+          # the engine of the one required status check on `main`. The risk was
+          # real and is now measured — `agpalindrome/okf-model#4` made the same
+          # switch against the same git-hooks.nix rev and the same nine hooks,
+          # and its CI is green. Between a guard maintained upstream and a
+          # rewrite of a generated file maintained here, upstream wins once the
+          # gate is no longer a gamble.
+          package = nixpkgs.legacyPackages.${system}.prek;
           hooks = {
             # `nixfmt` (not `nixfmt-rfc-style`): as of nixpkgs 25.11 the RFC 166
             # formatter *is* `pkgs.nixfmt`, and the old alias warns on eval.
@@ -126,21 +152,27 @@
             };
           };
         };
-      # The hooks git-hooks.nix installs pin absolute store paths, so a store
-      # garbage-collection breaks `git commit` with an error naming no cause
-      # (#98). scripts/harden-git-hooks.sh guards them on dev-shell entry; this
-      # runs its red/green pair, so a template change that left the guard a
-      # silent no-op fails the one required check rather than waiting to
-      # surface at somebody's next collection.
-      hookGuardFor =
+      # The reason for `package = pkgs.prek` above is a property of a template
+      # this repo neither owns nor tracks, so this installs a real hook from the
+      # pinned prek, takes its store path away, and runs it. A prek release that
+      # dropped the fallback fails the one required check here, rather than
+      # surfacing at somebody's next garbage-collection.
+      hookFallbackFor =
         system:
         let
           pkgs = nixpkgs.legacyPackages.${system};
         in
-        pkgs.runCommandLocal "hook-guard-self-test" { } ''
-          ${pkgs.bash}/bin/bash ${./scripts/harden-git-hooks.sh} --self-test
-          touch $out
-        '';
+        pkgs.runCommandLocal "hook-fallback"
+          {
+            nativeBuildInputs = [
+              pkgs.git
+              pkgs.prek
+            ];
+          }
+          ''
+            ${pkgs.bash}/bin/bash ${./scripts/check-hook-fallback.sh}
+            touch $out
+          '';
     in
     {
       packages = forAllSystems (system: {
@@ -161,7 +193,7 @@
       checks = forAllSystems (system: {
         pre-commit = hooksFor system;
         deon-check = deonCheckFor system;
-        hook-guard = hookGuardFor system;
+        hook-fallback = hookFallbackFor system;
       });
 
       devShells = forAllSystems (
@@ -172,13 +204,34 @@
         in
         {
           default = pkgs.mkShell {
-            # git-hooks.nix installs the hooks, then the guard rewrites the
-            # store paths its installer pinned into them (#98). It runs on
-            # every entry, not once: a reinstall regenerates the hook from the
-            # same template and brings the pinned paths back.
+            # Retire the hooks the previous driver left behind, in any clone
+            # that predates the `prek` switch above.
+            #
+            # Switching drivers does not converge on its own, and neither
+            # tool's docs say so. `prek install` refuses to discard a hook it
+            # did not write: it moves it to `<hook>.legacy` and goes on running
+            # it, so the pinned shebang stays on the commit path. `prek
+            # uninstall` puts it back — and git-hooks.nix uninstalls every hook
+            # type before it installs, so each entry resurrects the pinned file
+            # rather than retiring it. Measured against prek 0.4.4 in a scratch
+            # repo (2026-08-12), on a copy of the hook #99's guard produces:
+            # that rewrite kept pre-commit's generator line, so the finding
+            # `agpalindrome/okf-model#4` reports transfers here verbatim.
+            #
+            # Deleting it after the install breaks the cycle — the next entry
+            # finds nothing to restore. The generator marker is what makes it
+            # safe to do unasked: it matches only a file pre-commit wrote, or
+            # #99's rewrite of one, never a hook someone parked here by hand.
             shellHook = ''
               ${hooks.shellHook}
-              ${pkgs.bash}/bin/bash ${./scripts/harden-git-hooks.sh}
+              if hooks_dir="$(${pkgs.git}/bin/git rev-parse --path-format=absolute --git-path hooks 2>/dev/null)"; then
+                for legacy in "$hooks_dir"/*.legacy; do
+                  if [ -f "$legacy" ] && ${pkgs.gnugrep}/bin/grep -q '^# File generated by pre-commit:' "$legacy"; then
+                    echo 1>&2 "okf-tools: removing the pre-commit-era hook $legacy (see flake.nix)"
+                    rm -f "$legacy"
+                  fi
+                done
+              fi
             '';
             # hygiene tools + the Rust toolchain for local `cargo` work (mkShell's
             # stdenv provides the C compiler the build scripts link against).

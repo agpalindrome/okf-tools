@@ -121,14 +121,18 @@ stays useful.
   ruleset and the About block (`.github/settings/about.json` — description,
   homepage, topics) against live GitHub; `--apply` writes them. It stays
   owner-run rather than wired into CI, so settings never change silently.
-- **Git hooks:** entering the dev shell installs pre-commit's hooks and then
-  runs `scripts/harden-git-hooks.sh` over them, which guards the store paths
-  nixpkgs pins into them (#98). A hook that reports pre-commit is gone means
-  the store was collected — re-enter the shell (`nix develop -c true`, or
-  `direnv reload`) to rebuild it. The same command fixes a
-  `.pre-commit-config.yaml` symlink gone stale against `flake.nix`, which is
-  how `nix flake check` and `git commit` come to disagree on one lint.
-  `--no-verify` is not the answer to either: it skips every check.
+- **Git hooks:** entering the dev shell installs them, and **`prek` is the
+  driver** (`package` in `flake.nix`, which argues the choice). The hook it
+  generates guards the store path it pins and falls back to `PATH`, so a
+  garbage-collection degrades it into a message naming `prek` rather than
+  breaking `git commit` opaquely (#98). `checks.hook-fallback` installs a real
+  hook and takes that path away, so a prek release dropping the guard fails CI
+  instead of surfacing at someone's next collection. A hook that reports prek
+  is gone, or a `.pre-commit-config.yaml` symlink gone stale against
+  `flake.nix` — the way `nix flake check` and `git commit` come to disagree on
+  one lint — are both fixed by re-entering the shell (`nix develop -c true`, or
+  `direnv reload`). `--no-verify` is not the answer to either: it skips every
+  check.
 - **Docs lint at 80 columns**, and emphasis style must be *consistent within
   each file* (MD049 infers it from the first use — `docs/DESIGN.md` is
   underscore, this file is asterisk). Both bite often.

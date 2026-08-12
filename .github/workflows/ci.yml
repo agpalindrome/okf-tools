@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   # The fast hygiene hooks: nixfmt, deadnix, statix, markdownlint, check-yaml,
-  # and whitespace/EOF — exactly the local pre-commit set, so CI == `nix flake
+  # and whitespace/EOF — exactly the local hook set, so CI == `nix flake
   # check` (one source of truth). This is deon's founding required-status leg;
   # the Rust checker's fmt/clippy/test gate joins it when the checker lands.
   hooks:
