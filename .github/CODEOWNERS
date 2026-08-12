@@ -1,4 +1,7 @@
-# The repository owner is the required reviewer for every change. GitHub
-# automatically requests review from the owner on every pull request, so
-# contributors do not need to add them by hand.
-* @ojhermann
+# Both handles are accounts of one operator, so this is a second credential
+# rather than a second reviewer: it buys attribution and a working approval
+# path, not independent review. GitHub blocks self-approval by author identity,
+# so a pull request opened by either account can be approved by the other, and
+# both on one line means either approval satisfies the code-owner rule the
+# `main` ruleset requires. Review is requested from both automatically.
+* @ojhermann @otto-agpalindrome
