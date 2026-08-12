@@ -121,6 +121,14 @@ stays useful.
   ruleset and the About block (`.github/settings/about.json` — description,
   homepage, topics) against live GitHub; `--apply` writes them. It stays
   owner-run rather than wired into CI, so settings never change silently.
+- **Git hooks:** entering the dev shell installs pre-commit's hooks and then
+  runs `scripts/harden-git-hooks.sh` over them, which guards the store paths
+  nixpkgs pins into them (#98). A hook that reports pre-commit is gone means
+  the store was collected — re-enter the shell (`nix develop -c true`, or
+  `direnv reload`) to rebuild it. The same command fixes a
+  `.pre-commit-config.yaml` symlink gone stale against `flake.nix`, which is
+  how `nix flake check` and `git commit` come to disagree on one lint.
+  `--no-verify` is not the answer to either: it skips every check.
 - **Docs lint at 80 columns**, and emphasis style must be *consistent within
   each file* (MD049 infers it from the first use — `docs/DESIGN.md` is
   underscore, this file is asterisk). Both bite often.

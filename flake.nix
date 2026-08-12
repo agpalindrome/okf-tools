@@ -126,6 +126,21 @@
             };
           };
         };
+      # The hooks git-hooks.nix installs pin absolute store paths, so a store
+      # garbage-collection breaks `git commit` with an error naming no cause
+      # (#98). scripts/harden-git-hooks.sh guards them on dev-shell entry; this
+      # runs its red/green pair, so a template change that left the guard a
+      # silent no-op fails the one required check rather than waiting to
+      # surface at somebody's next collection.
+      hookGuardFor =
+        system:
+        let
+          pkgs = nixpkgs.legacyPackages.${system};
+        in
+        pkgs.runCommandLocal "hook-guard-self-test" { } ''
+          ${pkgs.bash}/bin/bash ${./scripts/harden-git-hooks.sh} --self-test
+          touch $out
+        '';
     in
     {
       packages = forAllSystems (system: {
@@ -146,6 +161,7 @@
       checks = forAllSystems (system: {
         pre-commit = hooksFor system;
         deon-check = deonCheckFor system;
+        hook-guard = hookGuardFor system;
       });
 
       devShells = forAllSystems (
@@ -156,7 +172,14 @@
         in
         {
           default = pkgs.mkShell {
-            inherit (hooks) shellHook;
+            # git-hooks.nix installs the hooks, then the guard rewrites the
+            # store paths its installer pinned into them (#98). It runs on
+            # every entry, not once: a reinstall regenerates the hook from the
+            # same template and brings the pinned paths back.
+            shellHook = ''
+              ${hooks.shellHook}
+              ${pkgs.bash}/bin/bash ${./scripts/harden-git-hooks.sh}
+            '';
             # hygiene tools + the Rust toolchain for local `cargo` work (mkShell's
             # stdenv provides the C compiler the build scripts link against).
             buildInputs = hooks.enabledPackages ++ [
