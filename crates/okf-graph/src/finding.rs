@@ -111,6 +111,13 @@ pub enum Rule {
     /// CONCEPT-10: these are supporting signals a consumer weighs, not a
     /// required core it needs.
     MalformedSourceSignal,
+    /// CONCEPT-15: `stale_after` names a day that has arrived — §5.5's
+    /// `today >= stale_after`. A report, and the only rule whose answer depends
+    /// on something outside the bundle: a stale concept is a true statement
+    /// about a conformant document, the class BUNDLE-2 is in, and the spec's own
+    /// worked example (Appendix A) ships a concept past its date. `--deny
+    /// CONCEPT-15` is how a producer gates on it.
+    StaleConcept,
 }
 
 impl Rule {
@@ -145,6 +152,7 @@ impl Rule {
         Rule::MalformedTimestamp,
         Rule::MalformedStaleAfter,
         Rule::MalformedSourceSignal,
+        Rule::StaleConcept,
     ];
 
     /// The rule with this code, ASCII-case-insensitively — a code is typed by
@@ -187,6 +195,7 @@ impl Rule {
             Rule::MalformedTimestamp => "CONCEPT-12",
             Rule::MalformedStaleAfter => "CONCEPT-13",
             Rule::MalformedSourceSignal => "CONCEPT-14",
+            Rule::StaleConcept => "CONCEPT-15",
         }
     }
 
@@ -217,6 +226,7 @@ impl Rule {
             Rule::MalformedTimestamp => "malformed timestamp",
             Rule::MalformedStaleAfter => "malformed stale_after",
             Rule::MalformedSourceSignal => "malformed source signal",
+            Rule::StaleConcept => "stale concept",
         }
     }
 
@@ -232,7 +242,8 @@ impl Rule {
             | Rule::DanglingLogEntry
             | Rule::MalformedParameter
             | Rule::IncompleteAttestation
-            | Rule::MalformedSourceSignal => Severity::Report,
+            | Rule::MalformedSourceSignal
+            | Rule::StaleConcept => Severity::Report,
             Rule::NotAConcept
             | Rule::MissingType
             | Rule::DuplicateId
@@ -394,7 +405,7 @@ mod tests {
         }
         assert_eq!(
             Rule::ALL.len(),
-            24,
+            25,
             "a rule was added without a test update"
         );
     }
@@ -419,6 +430,7 @@ mod tests {
         assert_eq!(Rule::MalformedParameter.severity(), Severity::Report);
         assert_eq!(Rule::IncompleteAttestation.severity(), Severity::Report);
         assert_eq!(Rule::MalformedSourceSignal.severity(), Severity::Report);
+        assert_eq!(Rule::StaleConcept.severity(), Severity::Report);
         for rule in [
             Rule::NotAConcept,
             Rule::MissingType,

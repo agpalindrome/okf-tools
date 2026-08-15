@@ -138,6 +138,71 @@ fn an_unknown_rule_code_exits_two() {
     assert_eq!(missing.status.code(), Some(2));
 }
 
+/// `--as-of` pins the day §5.5 is read against, so a run is reproducible: the
+/// same bundle is stale on one day and clean on the day before, and neither
+/// answer moves with the machine's clock.
+#[test]
+fn as_of_pins_the_day_staleness_is_read_against() {
+    let stale = okf_graph()
+        .args(["--as-of", "2026-08-15"])
+        .arg(fixture("stale"))
+        .output()
+        .expect("runs");
+    assert_eq!(
+        stale.status.code(),
+        Some(0),
+        "a stale concept still conforms"
+    );
+    let stdout = String::from_utf8_lossy(&stale.stdout);
+    assert!(stdout.contains("CONCEPT-15"), "stdout:\n{stdout}");
+    assert!(stdout.contains("expired.md"), "stdout:\n{stdout}");
+    assert!(
+        !stdout.contains("current.md") && !stdout.contains("undated.md"),
+        "only the expired concept is stale; stdout:\n{stdout}"
+    );
+
+    let earlier = okf_graph()
+        .args(["--as-of", "2025-12-31"])
+        .arg(fixture("stale"))
+        .output()
+        .expect("runs");
+    assert_eq!(earlier.status.code(), Some(0));
+    assert!(String::from_utf8_lossy(&earlier.stdout).is_empty());
+}
+
+/// The producer's case, and the reason CONCEPT-15 is a rule rather than a note:
+/// `--deny` gates CI on a concept that has gone stale.
+#[test]
+fn denying_staleness_fails_the_run() {
+    let output = okf_graph()
+        .args(["--deny", "CONCEPT-15", "--as-of", "2026-08-15"])
+        .arg(fixture("stale"))
+        .output()
+        .expect("runs");
+
+    assert_eq!(output.status.code(), Some(1));
+    assert!(
+        String::from_utf8_lossy(&output.stderr).contains("1 defect(s)"),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+/// An `--as-of` that is not a date is a usage error, like a mistyped rule code:
+/// silently falling back to today would answer a question nobody asked.
+#[test]
+fn a_malformed_as_of_exits_two() {
+    let bad = okf_graph()
+        .args(["--as-of", "15-08-2026"])
+        .arg(fixture("stale"))
+        .output()
+        .expect("runs");
+    assert_eq!(bad.status.code(), Some(2));
+
+    let missing = okf_graph().arg("--as-of").output().expect("runs");
+    assert_eq!(missing.status.code(), Some(2));
+}
+
 /// A bundle with no concepts is a usage error, not a clean run: a mistyped path
 /// or a bundle that never generated would otherwise pass CI green.
 #[test]

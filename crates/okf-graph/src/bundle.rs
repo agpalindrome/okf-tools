@@ -177,9 +177,53 @@ impl Bundle {
         findings
     }
 
+    /// The concepts §5.5 calls stale on `today` — `today >= stale_after` — as
+    /// `CONCEPT-15` findings in Concept ID order.
+    ///
+    /// Separate from [`findings`] rather than computed during [`load`], and the
+    /// separation is the whole design. Every other finding is a function of the
+    /// bundle alone, so a fixture that reports nothing today reports nothing
+    /// forever; folding a clock into `load` would make the same tree answer
+    /// differently tomorrow and quietly put an expiry date on this crate's own
+    /// test suite. Here the day is an argument: the binary passes
+    /// [`Date::today`], a test passes a day it pins, and a producer asking what
+    /// goes stale next quarter passes that.
+    ///
+    /// A `stale_after` that is not a date yields nothing here — it is already a
+    /// `CONCEPT-13` defect from [`load`], so the silence is a finding already
+    /// made rather than a question dropped.
+    ///
+    /// [`findings`]: Bundle::findings
+    /// [`load`]: Bundle::load
+    /// [`Date::today`]: crate::Date::today
+    pub fn stale_as_of(&self, today: Date) -> Vec<Finding> {
+        self.concepts()
+            .filter_map(|(id, concept)| {
+                let declared = concept.frontmatter().stale_after()?;
+                let stale_after = Date::parse(&declared)?;
+                (today >= stale_after).then(|| {
+                    Finding::new(
+                        format!("{id}.md"),
+                        Rule::StaleConcept,
+                        format!("stale as of {today}: `stale_after` = `{declared}` (SPEC §5.5)"),
+                    )
+                })
+            })
+            .collect()
+    }
+
     /// Whether the bundle fails under `policy` — whether any finding reaches
-    /// [`Level::Defect`]. This is the exit code's question, and the only one a
-    /// caller has to ask to gate on it.
+    /// [`Level::Defect`]. This is the exit code's question for the load's own
+    /// findings.
+    ///
+    /// It does not read [`check`] or [`stale_as_of`], which are computed against
+    /// something the bundle does not contain and are the caller's to hold. A
+    /// caller that denies one of those rules asks the same question of its own
+    /// combined list — `findings.iter().any(|f| policy.level(&f.rule) ==
+    /// Level::Defect)` — which is what the binary does.
+    ///
+    /// [`check`]: Bundle::check
+    /// [`stale_as_of`]: Bundle::stale_as_of
     pub fn fails(&self, policy: &Policy) -> bool {
         self.findings
             .iter()

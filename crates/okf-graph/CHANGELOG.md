@@ -3,6 +3,33 @@
 Notable changes to `okf-graph`, newest first. The crate is pre-1.0: a minor bump
 may break the API, and an MSRV change is one of the things that earns it.
 
+## Unreleased
+
+### Added
+
+- **CONCEPT-15**, §5.5's staleness comparison: a concept is stale when
+  `today >= stale_after`, and until now that date was checked for shape and
+  never read. §5.5 states the predicate rather than leaving it to a consumer's
+  judgement, and §10.5 says what to do about it, so applying it is inside "as
+  far as the spec and no further" — where a relationship between two fields §5.2
+  calls independent was outside it. A report, not a defect: a stale concept is
+  still conformant, and the spec's own worked example ships one past its date.
+  `--deny CONCEPT-15` is how a producer gates CI on it. Named in
+  [#103](https://github.com/ojhermann-org/okf-tools/issues/103).
+- `Bundle::stale_as_of(day)`, `Date::today`, `Date`'s `Display`, and `--as-of
+  <DATE>` on the binary. The day is an argument rather than a call to the clock,
+  and the check sits beside `Bundle::check` rather than inside `Bundle::load`,
+  so every finding a load produces stays a pure function of the tree — a bundle
+  that loads clean loads clean forever. Folding the clock into `load` would have
+  been the shorter change and would have hung an expiry date on this crate's own
+  fixtures, one of which declares `stale_after: 2026-12-31`. `--as-of` also
+  makes a CI run reproducible and answers what goes stale next quarter; it
+  defaults to today in UTC, since `std` carries no timezone database.
+- `Bundle::fails` is unchanged and still reads the load's own findings, so it
+  does not see a denied `CONCEPT-15` any more than it sees a denied caller
+  check. Its documentation now says so, and the binary counts its own combined
+  list.
+
 ## 0.2.0 — 2026-08-08
 
 ### Added

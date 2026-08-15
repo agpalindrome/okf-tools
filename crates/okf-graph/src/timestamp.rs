@@ -12,6 +12,8 @@
 //! profile every §5.2 example already uses; `docs/okf-friction.md` records the
 //! narrowing as a decision the spec text has not made.
 
+use std::fmt;
+
 /// A calendar day, read from the `YYYY-MM-DD` form §5 uses for `stale_after`
 /// (§5.5), `sources[].last_modified` and a `usage_window` bound (§5.1).
 ///
@@ -49,6 +51,42 @@ impl Date {
             month: month as u32,
             day: day as u32,
         })
+    }
+
+    /// Today, in UTC.
+    ///
+    /// The crate's only reading of the clock, and no check calls it: §5.5's
+    /// comparison takes the day as an argument ([`Bundle::stale_as_of`]), so a
+    /// finding stays a function of its inputs and a caller can ask what a bundle
+    /// looks like on a day other than this one.
+    ///
+    /// UTC because `std` carries no timezone database. Worth stating rather than
+    /// leaving implicit: within a day of the boundary, a consumer far enough west
+    /// is told a concept is stale some hours before its own calendar agrees.
+    ///
+    /// [`Bundle::stale_as_of`]: crate::Bundle::stale_as_of
+    pub fn today() -> Date {
+        let seconds = match std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH) {
+            Ok(since) => since.as_secs() as i64,
+            Err(before) => -(before.duration().as_secs() as i64),
+        };
+        // Floor division, so a clock set before the epoch lands on the day it is
+        // in rather than the one after it.
+        Date::from_days(seconds.div_euclid(86_400))
+    }
+
+    /// The day `days` after 1970-01-01.
+    fn from_days(days: i64) -> Date {
+        let (year, month, day) = civil_from_days(days);
+        Date { year, month, day }
+    }
+}
+
+impl fmt::Display for Date {
+    /// The `YYYY-MM-DD` form §5 writes, so a date this crate computed and a date
+    /// a document declared print alike.
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:04}-{:02}-{:02}", self.year, self.month, self.day)
     }
 }
 
@@ -188,6 +226,34 @@ fn days_from_civil(year: i64, month: i64, day: i64) -> i64 {
     era * 146_097 + day_of_era - 719_468
 }
 
+/// The proleptic-Gregorian civil date `days` after 1970-01-01, as
+/// `(year, month, day)` — Hinnant's `civil_from_days`, the inverse of
+/// [`days_from_civil`]. Both are kept as published, so the pair can be read
+/// against the paper rather than against each other.
+fn civil_from_days(days: i64) -> (i64, u32, u32) {
+    let days = days + 719_468;
+    let era = if days >= 0 { days } else { days - 146_096 } / 146_097;
+    let day_of_era = days - era * 146_097;
+    let year_of_era =
+        (day_of_era - day_of_era / 1460 + day_of_era / 36_524 - day_of_era / 146_096) / 365;
+    let year = year_of_era + era * 400;
+    let day_of_year = day_of_era - (365 * year_of_era + year_of_era / 4 - year_of_era / 100);
+    let shifted_month = (5 * day_of_year + 2) / 153;
+    let day = day_of_year - (153 * shifted_month + 2) / 5 + 1;
+    // The algorithm counts from March, so January and February belong to the
+    // following calendar year.
+    let month = if shifted_month < 10 {
+        shifted_month + 3
+    } else {
+        shifted_month - 9
+    };
+    (
+        if month <= 2 { year + 1 } else { year },
+        month as u32,
+        day as u32,
+    )
+}
+
 /// Days in a month of a proleptic-Gregorian year.
 fn days_in_month(year: i64, month: i64) -> i64 {
     match month {
@@ -234,6 +300,55 @@ mod tests {
         ] {
             assert!(Date::parse(text).is_none(), "{text} should not parse");
         }
+    }
+
+    #[test]
+    fn a_date_prints_the_padded_form_it_parses() {
+        assert_eq!(Date::parse("2026-06-01").unwrap().to_string(), "2026-06-01");
+        assert_eq!(Date::from_days(0).to_string(), "1970-01-01");
+    }
+
+    /// The anchors are day numbers from `date -u -d <text> +%s` divided by
+    /// 86400 (GNU coreutils 9.11, 2026-08-15), so `from_days` is checked against
+    /// something other than the function it inverts. 2000-03-01 is the era
+    /// boundary the algorithm counts from, and 2024-02-29 is a leap day in the
+    /// two months it shifts into the previous year.
+    #[test]
+    fn from_days_lands_where_date_puts_the_day() {
+        for (days, text) in [
+            (0, "1970-01-01"),
+            (11_017, "2000-03-01"),
+            (19_782, "2024-02-29"),
+            (20_680, "2026-08-15"),
+        ] {
+            assert_eq!(Date::from_days(days).to_string(), text);
+        }
+    }
+
+    /// And the round trip in the other direction, over every day of four
+    /// centuries — the range where a leap-year rule that only mostly works
+    /// would show up.
+    #[test]
+    fn from_days_inverts_days_from_civil() {
+        for days in -25_567..120_000 {
+            let date = Date::from_days(days);
+            assert_eq!(
+                days_from_civil(date.year, i64::from(date.month), i64::from(date.day)),
+                days,
+                "{date}"
+            );
+            assert_eq!(Date::parse(&date.to_string()), Some(date));
+        }
+    }
+
+    /// Nothing pins what the clock says, so this pins what it cannot say: a
+    /// today that failed to convert would land far outside the range a running
+    /// machine's clock can hold.
+    #[test]
+    fn today_is_a_date_this_century() {
+        let today = Date::today();
+        assert!(today > Date::parse("2000-01-01").unwrap(), "{today}");
+        assert!(today < Date::parse("2100-01-01").unwrap(), "{today}");
     }
 
     /// The anchors come from `date -u --date=<text> +%s` (GNU coreutils 9.11,
