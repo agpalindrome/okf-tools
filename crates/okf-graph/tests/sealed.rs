@@ -16,7 +16,7 @@ use std::process::{Command, Output};
 /// Every `Rule` variant. A new rule has to be added here, and that is the point:
 /// the day this list is complete and the match still fails, the seal is what is
 /// holding.
-const RULES: [&str; 24] = [
+const RULES: [&str; 25] = [
     "NotAConcept",
     "MissingType",
     "DuplicateId",
@@ -41,6 +41,7 @@ const RULES: [&str; 24] = [
     "MalformedTimestamp",
     "MalformedStaleAfter",
     "MalformedSourceSignal",
+    "StaleConcept",
 ];
 
 /// Compile `source` as a downstream crate against this crate's rlib.

@@ -132,6 +132,28 @@ provenance and derivation graph and its cycles ([§5.1]); and the structure of
 the reserved `index.md` and `log.md` ([§8], [§9]), including a declared
 `okf_version` ([§12]).
 
+### 6.1 The one finding that is not a function of the bundle
+
+[§5.5] does not leave staleness to a reading — it states the predicate, _"a
+concept is stale when `today >= stale_after`"_ — and [§10.5] says what a
+consumer does about it. So `CONCEPT-15` is checked, and it is the only rule
+whose answer depends on something outside the tree.
+
+That dependency is made an argument rather than a call to the clock.
+`Bundle::stale_as_of(day)` sits beside `Bundle::check` and outside
+`Bundle::load`, so every finding `load` produces stays a pure function of the
+bundle: a fixture that loads clean loads clean forever, and a red fixture stays
+red on the day it was written and on every day after. Putting the clock inside
+`load` would have been the shorter change and would have hung an expiry date on
+the test suite — this crate's own `clean` fixture declares
+`stale_after: 2026-12-31`, so the suite would have started reporting on a date
+nobody had marked in it.
+
+It is a _report_, not a defect. A stale concept is a true statement about a
+conformant document — the class `BUNDLE-2` is in — and rejecting a bundle over
+one would fail the spec's own worked example, which ships a concept past its
+date. `--deny CONCEPT-15` is the producer's lever, as for any other report.
+
 ## 7. Deferred
 
 Out of scope here, by the layer boundary or by the nature of the problem:
@@ -163,5 +185,6 @@ Out of scope here, by the layer boundary or by the nature of the problem:
 [§9]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md#9-log-files
 [§10]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md#10-attested-computations-concept
 [§10.3]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md#103-the-computation
+[§10.5]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md#105-how-a-consumer-uses-it-informative
 [§11]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md#11-conformance
 [§12]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md#12-versioning

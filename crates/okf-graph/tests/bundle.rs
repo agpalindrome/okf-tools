@@ -3,7 +3,7 @@
 
 use std::path::PathBuf;
 
-use okf_graph::{Bundle, Level, Policy, Rule, Severity};
+use okf_graph::{Bundle, Date, Level, Policy, Rule, Severity};
 
 fn fixture(name: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -219,6 +219,71 @@ fn a_source_without_resource_is_reported() {
     assert_eq!(bundle.findings().len(), 1);
     assert_eq!(bundle.findings()[0].rule, Rule::MissingSourceResource);
     assert_eq!(bundle.findings()[0].file, "thing.md");
+}
+
+/// §5.5's staleness comparison, which no other rule makes: a concept whose
+/// `stale_after` has arrived is CONCEPT-15, and one whose has not — or which
+/// declares none — is not. The day is an argument, so the fixture's dates and
+/// the answer are both fixed forever.
+#[test]
+fn a_concept_past_its_stale_after_is_reported_as_of_that_day() {
+    let bundle = Bundle::load(&fixture("stale")).expect("loads");
+
+    // The load itself is unchanged: three conformant documents, no findings,
+    // whatever day this runs on.
+    assert!(
+        bundle.findings().is_empty(),
+        "expected no findings, got: {:?}",
+        bundle.findings()
+    );
+
+    let findings = bundle.stale_as_of(Date::parse("2026-08-15").unwrap());
+    assert_eq!(findings.len(), 1);
+    assert_eq!(findings[0].file, "expired.md");
+    assert_eq!(findings[0].rule, Rule::StaleConcept);
+    assert_eq!(findings[0].severity(), Some(Severity::Report));
+    assert!(
+        findings[0].detail.contains("2026-01-01"),
+        "the finding names the declared date: {}",
+        findings[0].detail
+    );
+    assert!(
+        findings[0].detail.contains("2026-08-15"),
+        "and the day it was read against: {}",
+        findings[0].detail
+    );
+}
+
+/// §5.5 is `today >= stale_after`, so the named day is itself stale. The
+/// off-by-one is the whole rule: a concept reported one day late is a checker
+/// that agrees with the spec everywhere except where it matters.
+#[test]
+fn the_stale_after_day_is_itself_stale_and_the_day_before_is_not() {
+    let bundle = Bundle::load(&fixture("stale")).expect("loads");
+
+    let on_the_day = bundle.stale_as_of(Date::parse("2026-01-01").unwrap());
+    assert_eq!(on_the_day.len(), 1);
+    assert_eq!(on_the_day[0].file, "expired.md");
+
+    assert!(bundle
+        .stale_as_of(Date::parse("2025-12-31").unwrap())
+        .is_empty());
+}
+
+/// A `stale_after` nothing can read is CONCEPT-13 at load and silent here. The
+/// silence is a finding already made, not a question dropped — the near-miss
+/// this codebase exists to catch would be reporting neither.
+#[test]
+fn an_unreadable_stale_after_is_a_defect_not_a_staleness_verdict() {
+    let bundle = Bundle::load(&fixture("bad-dates")).expect("loads");
+
+    assert!(bundle
+        .findings()
+        .iter()
+        .any(|f| f.rule == Rule::MalformedStaleAfter));
+    assert!(bundle
+        .stale_as_of(Date::parse("2099-01-01").unwrap())
+        .is_empty());
 }
 
 /// A well-formed Attested Computation — `runtime` present, exactly one

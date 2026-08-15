@@ -26,8 +26,9 @@ Every rule the spec makes checkable ships as a _located finding_, at two levels:
   [§5] families — a present, non-empty `type`; frontmatter field shapes; the
   provenance / trust / lifecycle metadata; the actor convention ([§7]); the
   `generated.at` and `verified[].at` timestamps, read as RFC 3339; the
-  `YYYY-MM-DD` dates of `stale_after` and the credibility signals; and the
-  Attested-Computation contract ([§10]).
+  `YYYY-MM-DD` dates of `stale_after` and the credibility signals, and whether
+  a `stale_after` has arrived ([§5.5]); and the Attested-Computation contract
+  ([§10]).
 - **Whole-bundle** reads the graph — unique Concept IDs and reserved-file
   exclusion, body-link resolution, the path-valued fields and the `references/`
   convention, the provenance / derivation graph and its cycles, and the
@@ -39,6 +40,30 @@ model is permissive ([§11]), so a report is surfaced and printed but does not
 fail the run; only defects do. The full model — the edge kinds and why acyclicity
 is checked per kind, the defect/report cut, the deferred boundary — is in the
 [design note][design].
+
+## Staleness, and the day it is read against
+
+One rule asks a question the bundle alone does not answer. [§5.5] defines a
+concept as stale when `today >= stale_after`, so `CONCEPT-15` is a function of
+the bundle _and_ a date. It is a report: a stale concept is still conformant,
+and the spec's own [worked example][appendix-a] ships one past its date.
+
+The day is an argument rather than a call to the clock. `--as-of 2026-08-15`
+pins it — which is what makes a CI run reproducible, and what lets a producer
+ask what goes stale next quarter — and it defaults to today in UTC. In the
+library it is `Bundle::stale_as_of(day)`, deliberately outside `Bundle::load`:
+every other finding is a function of the tree, so a bundle that loads clean
+loads clean forever, and a clock inside `load` would put a quiet expiry date on
+every fixture anyone writes.
+
+```sh
+# Reported, and the run still passes — the concept conforms.
+nix run .#okf-graph -- --as-of 2026-08-15 crates/okf-graph/tests/fixtures/stale
+# expired.md  CONCEPT-15 (stale concept): stale as of 2026-08-15: …
+
+# Unless the bundle is yours and stale is a failure (exit 1).
+nix run .#okf-graph -- --deny CONCEPT-15 crates/okf-graph/tests/fixtures/stale
+```
 
 ## Run it
 
@@ -134,11 +159,13 @@ Unless you state otherwise, a contribution you submit for inclusion in this
 work, as defined in Apache-2.0, is dual licensed as above with no additional
 terms.
 
+[appendix-a]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md#appendix-a-worked-example-an-income-statement
 [design]: https://github.com/ojhermann-org/okf-tools/blob/main/docs/okf-graph-DESIGN.md
 [friction]: https://github.com/ojhermann-org/okf-tools/blob/main/docs/okf-friction.md
 [okf-spec]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md
 [§4]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md#4-concept-documents
 [§5]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md#5-provenance-trust-and-lifecycle
+[§5.5]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md#55-lifecycle-stale_after
 [§7]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md#7-actor-convention
 [§10]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md#10-attested-computations-concept
 [§11]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md#11-conformance
