@@ -62,6 +62,51 @@ fn no_arguments_exits_two() {
     assert_eq!(output.status.code(), Some(2));
 }
 
+/// `--version` answers with no bundle to hand, and reports the crate's own
+/// version rather than a string maintained beside it. The pin in a CI step is
+/// an instruction; this is what lets the log assert what the instruction got.
+#[test]
+fn version_prints_the_crate_version_and_exits_zero() {
+    for flag in ["-V", "--version"] {
+        let output = okf_graph().arg(flag).output().expect("runs");
+        assert_eq!(output.status.code(), Some(0), "{flag}");
+        assert_eq!(
+            String::from_utf8_lossy(&output.stdout).trim(),
+            format!("okf-graph {}", env!("CARGO_PKG_VERSION")),
+            "{flag}"
+        );
+    }
+}
+
+/// The summary names the binary that produced it. Which rules ran is a property
+/// of the version — CONCEPT-15 did not exist in 0.2.0 — so a summary that does
+/// not say which version it is does not say what it checked.
+#[test]
+fn the_summary_names_the_version_that_produced_it() {
+    let output = okf_graph().arg(fixture("clean")).output().expect("runs");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.starts_with(&format!("okf-graph {}: ", env!("CARGO_PKG_VERSION"))),
+        "stderr: {stderr}"
+    );
+}
+
+/// `--quiet` suppresses the summary, so it suppresses the version with it: the
+/// caller that asked for findings only did not ask for a header instead.
+#[test]
+fn quiet_suppresses_the_version_too() {
+    let output = okf_graph()
+        .arg("--quiet")
+        .arg(fixture("clean"))
+        .output()
+        .expect("runs");
+    assert!(
+        String::from_utf8_lossy(&output.stderr).is_empty(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
 /// `--deny` on a tolerated rule is the producer's case: the `dangling` fixture
 /// passes by default and fails once `BUNDLE-2` is denied.
 #[test]
