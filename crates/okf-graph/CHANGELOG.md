@@ -3,6 +3,31 @@
 Notable changes to `okf-graph`, newest first. The crate is pre-1.0: a minor bump
 may break the API, and an MSRV change is one of the things that earns it.
 
+## Unreleased
+
+### Changed
+
+- **An unrecognised flag is now an error naming itself**, rather than becoming
+  the bundle path. One typo used to produce three unrelated diagnoses depending
+  on where it sat — that it is not a directory, that too many paths were given,
+  or that no rule has that code — none of which mentioned the typo. All three
+  were already exit 2, so this changes what a failing run *says*, not whether it
+  fails. Reported in
+  [#109](https://github.com/agpalindrome/okf-tools/issues/109).
+- **A bundle directory whose name begins with `-` now needs a `./` prefix.**
+  This is the cost of the rule above and the reason it is a `Changed` rather
+  than a `Fixed`: `okf-graph -weird` worked before and is now rejected, while
+  `./-weird` and any absolute path are unaffected. A `--` end-of-options marker
+  would have preserved the bare form, and was declined — the shell already
+  supplies the escape, and `--` adds a branch that no real invocation walks.
+
+- **A flag's argument that begins with `-` is a missing argument**, not a bad
+  value. `--deny --qiuet BUNDLE-2` reported that no rule has the code `--qiuet`,
+  naming the rule table for what is either a forgotten code or a mistyped flag;
+  `--as-of` did the same with dates. No rule code or date begins with a dash —
+  every code has an interior one, `BUNDLE-2`, and that still parses — so the
+  guard catches nothing legitimate.
+
 ## 0.4.0 — 2026-08-16
 
 ### Added

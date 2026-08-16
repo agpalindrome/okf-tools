@@ -19,6 +19,16 @@ use okf_graph::{Bundle, Date, Finding, Level, Policy, Rule};
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
+/// A flag's argument that begins with `-` is a missing argument, not a bad
+/// value. Both `--deny --quiet` (the code was forgotten) and `--deny --qiuet`
+/// (the next flag was mistyped) arrive here, and reporting either as an unknown
+/// rule code names the wrong thing — the same defect the option arm fixes one
+/// position to the left. No rule code or date starts with a dash, so nothing
+/// legitimate is caught (#109).
+fn looks_like_an_option(value: &str) -> bool {
+    value.starts_with('-')
+}
+
 const USAGE: &str = "\
 okf-graph — structural / topological validator for an OKF Knowledge Bundle
 
@@ -28,6 +38,7 @@ Usage:
 
 Arguments:
     <bundle>       a bundle directory, searched recursively for concept files
+                   (prefix it with `./` if its name starts with `-`)
 
 Options:
     --deny <CODE>  fail the run on this rule
@@ -92,6 +103,10 @@ fn main() -> ExitCode {
                     eprintln!("error: --as-of needs a date, e.g. `--as-of 2026-08-15`");
                     return ExitCode::from(2);
                 };
+                if looks_like_an_option(&date) {
+                    eprintln!("error: --as-of needs a date, but `{date}` looks like an option");
+                    return ExitCode::from(2);
+                }
                 let Some(date) = Date::parse(&date) else {
                     eprintln!("error: `{date}` is not a `YYYY-MM-DD` date");
                     return ExitCode::from(2);
@@ -108,11 +123,45 @@ fn main() -> ExitCode {
                     eprintln!("error: {arg} needs a rule code, e.g. `{arg} BUNDLE-2`");
                     return ExitCode::from(2);
                 };
+                if looks_like_an_option(&code) {
+                    eprintln!("error: {arg} needs a rule code, but `{code}` looks like an option");
+                    return ExitCode::from(2);
+                }
                 let Some(rule) = Rule::from_code(&code) else {
                     eprintln!("error: no rule has the code `{code}`");
                     return ExitCode::from(2);
                 };
                 policy.set(rule, level);
+            }
+            // `--` is the end-of-options marker everywhere else, so the person
+            // reaching for it is the one this change inconveniences: someone
+            // whose bundle path starts with `-`. Answering "not an option"
+            // would treat a correct instinct as a misspelling, so declining to
+            // implement it is a reason to say so and point at the escape.
+            "--" => {
+                eprintln!("error: `--` is not supported");
+                eprintln!("note: for a path that starts with `-`, prefix it with `./`");
+                return ExitCode::from(2);
+            }
+            // An unrecognised token that looks like a flag is a typo, not a
+            // path. Without this it became the bundle path and failed further
+            // down, so one mistake produced three unrelated diagnoses — that
+            // it is not a directory, that too many paths were given, or that
+            // no rule has that code — none of which named the typo (#109).
+            //
+            // The cost is that a directory whose name begins with `-` is no
+            // longer reachable by a bare relative path. `./-weird` and any
+            // absolute path still work, which is why this is preferred over a
+            // `--` end-of-options marker: the shell already supplies the
+            // escape, and `--` would add a branch nothing exercises.
+            a if a.starts_with('-') => {
+                eprintln!("error: `{a}` is not an option (see --help)");
+                // Deliberately not `./{a}`: echoing the token back suggests
+                // `./--qiuet` to someone who mistyped a flag, which is advice
+                // for the rarer of the two readings and nonsense for the
+                // likelier one.
+                eprintln!("note: for a path that starts with `-`, prefix it with `./`");
+                return ExitCode::from(2);
             }
             _ if bundle_path.is_none() => bundle_path = Some(arg),
             _ => {
