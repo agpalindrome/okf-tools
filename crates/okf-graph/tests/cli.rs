@@ -126,7 +126,32 @@ fn an_unrecognised_flag_is_rejected_rather_than_read_as_a_path() {
             stderr.contains("is not an option") && stderr.contains(args[0]),
             "expected the typo to be named; {args:?} gave:\n{stderr}"
         );
+        // The note is the whole mitigation for the input this change drops, so
+        // it is asserted rather than left to survive on inspection.
+        assert!(
+            stderr.contains("./"),
+            "expected the `./` escape to be offered; {args:?} gave:\n{stderr}"
+        );
     }
+}
+
+/// `--` is answered on its own terms. It is the end-of-options marker
+/// everywhere else, so the person typing it has the right instinct and the
+/// wrong tool here — telling them it is "not an option" would read as a
+/// spelling correction.
+#[test]
+fn the_end_of_options_marker_is_declined_by_name() {
+    let output = okf_graph()
+        .args(["--", fixture("clean").to_str().expect("utf-8")])
+        .output()
+        .expect("runs");
+
+    assert_eq!(output.status.code(), Some(2));
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("`--` is not supported") && stderr.contains("./"),
+        "stderr: {stderr}"
+    );
 }
 
 /// The same rule in the value position. `--deny --qiuet CODE` used to report

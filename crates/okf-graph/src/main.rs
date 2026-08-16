@@ -133,6 +133,16 @@ fn main() -> ExitCode {
                 };
                 policy.set(rule, level);
             }
+            // `--` is the end-of-options marker everywhere else, so the person
+            // reaching for it is the one this change inconveniences: someone
+            // whose bundle path starts with `-`. Answering "not an option"
+            // would treat a correct instinct as a misspelling, so declining to
+            // implement it is a reason to say so and point at the escape.
+            "--" => {
+                eprintln!("error: `--` is not supported");
+                eprintln!("note: for a path that starts with `-`, prefix it with `./`");
+                return ExitCode::from(2);
+            }
             // An unrecognised token that looks like a flag is a typo, not a
             // path. Without this it became the bundle path and failed further
             // down, so one mistake produced three unrelated diagnoses — that
