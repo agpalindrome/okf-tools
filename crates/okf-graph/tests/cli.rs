@@ -135,6 +135,28 @@ fn an_unrecognised_flag_is_rejected_rather_than_read_as_a_path() {
     }
 }
 
+/// An empty bundle path names itself. `okf-graph "$DIR"` with `DIR` unset is
+/// the way this arrives, and it used to print a message with a blank where the
+/// path should be — or, with a real path after it, an arity error for a caller
+/// who passed one path.
+#[test]
+fn an_empty_bundle_path_is_rejected_and_says_why() {
+    for args in [vec![""], vec!["", "tests/fixtures/clean"]] {
+        let output = okf_graph().args(&args).output().expect("runs");
+        assert_eq!(output.status.code(), Some(2), "{args:?}");
+
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert!(
+            stderr.contains("bundle path is empty"),
+            "{args:?} gave:\n{stderr}"
+        );
+        assert!(
+            !stderr.contains("expected a single bundle path"),
+            "an empty path is not an arity problem; {args:?} gave:\n{stderr}"
+        );
+    }
+}
+
 /// `--` is answered on its own terms. It is the end-of-options marker
 /// everywhere else, so the person typing it has the right instinct and the
 /// wrong tool here — telling them it is "not an option" would read as a

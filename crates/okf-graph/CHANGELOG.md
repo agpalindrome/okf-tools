@@ -21,6 +21,11 @@ may break the API, and an MSRV change is one of the things that earns it.
   would have preserved the bare form, and was declined — the shell already
   supplies the escape, and `--` adds a branch that no real invocation walks.
 
+- **An empty bundle path is rejected by name.** `okf-graph "$DIR"` with `DIR`
+  unset printed `error: : bundle path is not a directory:` — a message with a
+  blank where the path should be — and `okf-graph "" bundle` was worse still,
+  reporting an arity problem to a caller who passed exactly one path, because
+  the empty token took the path slot first.
 - **A flag's argument that begins with `-` is a missing argument**, not a bad
   value. `--deny --qiuet BUNDLE-2` reported that no rule has the code `--qiuet`,
   naming the rule table for what is either a forgotten code or a mistyped flag;
