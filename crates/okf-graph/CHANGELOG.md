@@ -21,9 +21,12 @@ may break the API, and an MSRV change is one of the things that earns it.
   would have preserved the bare form, and was declined — the shell already
   supplies the escape, and `--` adds a branch that no real invocation walks.
 
-  The value position is unchanged: `--deny --qiuet CODE` still reports that no
-  rule has the code `--qiuet`. Naming the typo there is a separate judgement
-  about argument positions, and #109 asked for the option position.
+- **A flag's argument that begins with `-` is a missing argument**, not a bad
+  value. `--deny --qiuet BUNDLE-2` reported that no rule has the code `--qiuet`,
+  naming the rule table for what is either a forgotten code or a mistyped flag;
+  `--as-of` did the same with dates. No rule code or date begins with a dash —
+  every code has an interior one, `BUNDLE-2`, and that still parses — so the
+  guard catches nothing legitimate.
 
 ## 0.4.0 — 2026-08-16
 

@@ -129,6 +129,47 @@ fn an_unrecognised_flag_is_rejected_rather_than_read_as_a_path() {
     }
 }
 
+/// The same rule in the value position. `--deny --qiuet CODE` used to report
+/// that no rule has the code `--qiuet`, which names the rule table for what is
+/// a forgotten argument or a mistyped flag. No rule code or date begins with a
+/// dash, so nothing legitimate is caught.
+#[test]
+fn a_flag_argument_that_looks_like_an_option_is_rejected() {
+    let cases: [(&[&str], &str); 4] = [
+        (&["--deny", "--qiuet"], "rule code"),
+        (&["--warn", "--quiet"], "rule code"),
+        (&["--allow", "-h"], "rule code"),
+        (&["--as-of", "--quiet"], "date"),
+    ];
+
+    for (args, expected) in cases {
+        let output = okf_graph().args(args).output().expect("runs");
+        assert_eq!(output.status.code(), Some(2), "{args:?}");
+
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert!(
+            stderr.contains("looks like an option")
+                && stderr.contains(expected)
+                && stderr.contains(args[1]),
+            "expected the argument to be named; {args:?} gave:\n{stderr}"
+        );
+    }
+}
+
+/// A rule code containing a dash is still a rule code — the guard above keys on
+/// a *leading* dash, and every code in the table has an interior one.
+#[test]
+fn a_rule_code_with_an_interior_dash_still_works() {
+    let output = okf_graph()
+        .args(["--allow", "BUNDLE-2"])
+        .arg(fixture("dangling"))
+        .output()
+        .expect("runs");
+
+    assert_eq!(output.status.code(), Some(0));
+    assert!(!String::from_utf8_lossy(&output.stdout).contains("BUNDLE-2"));
+}
+
 /// The cost of the rule above, and its escape hatch. A directory whose name
 /// begins with `-` is no longer a bare relative path, but `./` still reaches
 /// it — which is why no `--` marker was added.

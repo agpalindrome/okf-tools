@@ -19,6 +19,16 @@ use okf_graph::{Bundle, Date, Finding, Level, Policy, Rule};
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
+/// A flag's argument that begins with `-` is a missing argument, not a bad
+/// value. Both `--deny --quiet` (the code was forgotten) and `--deny --qiuet`
+/// (the next flag was mistyped) arrive here, and reporting either as an unknown
+/// rule code names the wrong thing — the same defect the option arm fixes one
+/// position to the left. No rule code or date starts with a dash, so nothing
+/// legitimate is caught (#109).
+fn looks_like_an_option(value: &str) -> bool {
+    value.starts_with('-')
+}
+
 const USAGE: &str = "\
 okf-graph — structural / topological validator for an OKF Knowledge Bundle
 
@@ -93,6 +103,10 @@ fn main() -> ExitCode {
                     eprintln!("error: --as-of needs a date, e.g. `--as-of 2026-08-15`");
                     return ExitCode::from(2);
                 };
+                if looks_like_an_option(&date) {
+                    eprintln!("error: --as-of needs a date, but `{date}` looks like an option");
+                    return ExitCode::from(2);
+                }
                 let Some(date) = Date::parse(&date) else {
                     eprintln!("error: `{date}` is not a `YYYY-MM-DD` date");
                     return ExitCode::from(2);
@@ -109,6 +123,10 @@ fn main() -> ExitCode {
                     eprintln!("error: {arg} needs a rule code, e.g. `{arg} BUNDLE-2`");
                     return ExitCode::from(2);
                 };
+                if looks_like_an_option(&code) {
+                    eprintln!("error: {arg} needs a rule code, but `{code}` looks like an option");
+                    return ExitCode::from(2);
+                }
                 let Some(rule) = Rule::from_code(&code) else {
                     eprintln!("error: no rule has the code `{code}`");
                     return ExitCode::from(2);
