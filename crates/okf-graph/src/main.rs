@@ -143,6 +143,17 @@ fn main() -> ExitCode {
                 eprintln!("note: for a path that starts with `-`, prefix it with `./`");
                 return ExitCode::from(2);
             }
+            // An empty argument is an unset shell variable far more often than
+            // a deliberate path, and reading it as one printed a message with a
+            // blank where the path should be. It also stops `okf-graph "" b`
+            // reporting an arity problem it does not have, since the empty
+            // token would otherwise take the path slot and push `b` into the
+            // too-many-paths arm.
+            "" => {
+                eprintln!("error: the bundle path is empty");
+                eprintln!("note: an unset or empty shell variable expands to nothing");
+                return ExitCode::from(2);
+            }
             // An unrecognised token that looks like a flag is a typo, not a
             // path. Without this it became the bundle path and failed further
             // down, so one mistake produced three unrelated diagnoses — that
