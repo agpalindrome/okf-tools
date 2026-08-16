@@ -18,6 +18,11 @@
       ];
       forAllSystems = nixpkgs.lib.genAttrs systems;
 
+      # Read, not restated. Both uses below were hardcoded `0.1.0` while the
+      # workspace was at 0.3.0 (#106) — a derivation name is exactly the place
+      # a stale string sits unread, since nothing compares it to anything.
+      version = (nixpkgs.lib.importTOML ./Cargo.toml).workspace.package.version;
+
       # The Cargo workspace built hermetically: `cargo fmt --check` + `cargo
       # clippy -D warnings` gate the build, and `cargo test` (buildRustPackage's
       # default checkPhase) runs the acceptance suite across every member — the
@@ -36,7 +41,7 @@
         in
         pkgs.rustPlatform.buildRustPackage {
           pname = "deon-check";
-          version = "0.1.0";
+          inherit version;
           # Only the workspace inputs — keeps the build pure and off target/
           # etc. `crates/` carries each member's src, plus deon's tests/ and
           # examples/, which its acceptance tests read via CARGO_MANIFEST_DIR.
@@ -76,7 +81,7 @@
           pkgs = nixpkgs.legacyPackages.${system};
           workspace = deonCheckFor system;
         in
-        pkgs.runCommandLocal "okf-graph-0.1.0"
+        pkgs.runCommandLocal "okf-graph-${version}"
           {
             meta.mainProgram = "okf-graph";
           }

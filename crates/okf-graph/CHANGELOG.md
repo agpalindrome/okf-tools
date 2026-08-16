@@ -3,6 +3,29 @@
 Notable changes to `okf-graph`, newest first. The crate is pre-1.0: a minor bump
 may break the API, and an MSRV change is one of the things that earns it.
 
+## Unreleased
+
+### Added
+
+- `-V` / `--version` on the binary, and the version now leads the summary line.
+  A pinned CI step could not assert what it installed: the pin is an
+  instruction, and the parser read `--version` as a bundle path, so asking for
+  one produced an IO error about a directory rather than an answer. The summary
+  carries it too, because which rules ran is a property of the version rather
+  than of the bundle — CONCEPT-15 did not exist in 0.2.0, so `0 defect(s),
+  0 report(s)` did not record whether staleness was among the things checked.
+  `--version` alone asserts what is on `PATH`; the summary says what produced
+  these findings, and travels with them into a log read out of context.
+  `--quiet` suppresses the summary, and so suppresses the version with it.
+  Reported in [#106](https://github.com/agpalindrome/okf-tools/issues/106).
+
+### Fixed
+
+- The flake read `0.1.0` for both derivations while the workspace was at
+  `0.3.0`. It now reads `Cargo.toml`, so the two cannot drift again — a
+  derivation name is exactly the place a stale string sits unread, since
+  nothing compares it to anything.
+
 ## 0.3.0 — 2026-08-15
 
 ### Added

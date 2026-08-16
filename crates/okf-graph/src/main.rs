@@ -17,6 +17,8 @@ use std::process::ExitCode;
 
 use okf_graph::{Bundle, Date, Finding, Level, Policy, Rule};
 
+const VERSION: &str = env!("CARGO_PKG_VERSION");
+
 const USAGE: &str = "\
 okf-graph — structural / topological validator for an OKF Knowledge Bundle
 
@@ -36,6 +38,7 @@ Options:
                    (default: today, UTC)
     --quiet        print findings only (suppress the summary line)
     -h, --help     show this help
+    -V, --version  show the version
 
 Exit codes:
     0  no defects (reports may still be printed)
@@ -73,6 +76,13 @@ fn main() -> ExitCode {
         match arg.as_str() {
             "-h" | "--help" => {
                 println!("{USAGE}");
+                return ExitCode::SUCCESS;
+            }
+            // Answered before anything is read, so it works with no bundle to
+            // hand — the caller asking is a CI step proving what it installed,
+            // not one with a directory ready.
+            "-V" | "--version" => {
+                println!("okf-graph {VERSION}");
                 return ExitCode::SUCCESS;
             }
             "--quiet" => quiet = true,
@@ -168,8 +178,13 @@ fn main() -> ExitCode {
         } else {
             String::new()
         };
+        // The version leads the summary because which rules ran is a property
+        // of the binary, not of the bundle: CONCEPT-15 did not exist in 0.2.0,
+        // so `0 defect(s), 0 report(s)` does not say whether staleness was
+        // among the things checked. `--version` alone asserts what is on PATH;
+        // this says what produced these findings, and travels with them.
         eprintln!(
-            "{defects} defect(s), {reports} report(s){silenced} across {} concept(s) in {bundle_path}",
+            "okf-graph {VERSION}: {defects} defect(s), {reports} report(s){silenced} across {} concept(s) in {bundle_path}",
             bundle.len(),
         );
     }
