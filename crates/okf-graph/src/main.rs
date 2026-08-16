@@ -28,6 +28,7 @@ Usage:
 
 Arguments:
     <bundle>       a bundle directory, searched recursively for concept files
+                   (prefix it with `./` if its name starts with `-`)
 
 Options:
     --deny <CODE>  fail the run on this rule
@@ -113,6 +114,26 @@ fn main() -> ExitCode {
                     return ExitCode::from(2);
                 };
                 policy.set(rule, level);
+            }
+            // An unrecognised token that looks like a flag is a typo, not a
+            // path. Without this it became the bundle path and failed further
+            // down, so one mistake produced three unrelated diagnoses — that
+            // it is not a directory, that too many paths were given, or that
+            // no rule has that code — none of which named the typo (#109).
+            //
+            // The cost is that a directory whose name begins with `-` is no
+            // longer reachable by a bare relative path. `./-weird` and any
+            // absolute path still work, which is why this is preferred over a
+            // `--` end-of-options marker: the shell already supplies the
+            // escape, and `--` would add a branch nothing exercises.
+            a if a.starts_with('-') => {
+                eprintln!("error: `{a}` is not an option (see --help)");
+                // Deliberately not `./{a}`: echoing the token back suggests
+                // `./--qiuet` to someone who mistyped a flag, which is advice
+                // for the rarer of the two readings and nonsense for the
+                // likelier one.
+                eprintln!("note: for a path that starts with `-`, prefix it with `./`");
+                return ExitCode::from(2);
             }
             _ if bundle_path.is_none() => bundle_path = Some(arg),
             _ => {

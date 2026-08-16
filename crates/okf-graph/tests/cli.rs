@@ -107,6 +107,58 @@ fn quiet_suppresses_the_version_too() {
     );
 }
 
+/// A mistyped flag names itself, in every position. Before #109 each of these
+/// produced a different diagnosis — not a directory, too many paths — because
+/// the token became the bundle path and failed somewhere downstream of the
+/// mistake.
+#[test]
+fn an_unrecognised_flag_is_rejected_rather_than_read_as_a_path() {
+    for args in [
+        vec!["--qiuet"],
+        vec!["--qiuet", "tests/fixtures/clean"],
+        vec!["--alow-empty"],
+    ] {
+        let output = okf_graph().args(&args).output().expect("runs");
+        assert_eq!(output.status.code(), Some(2), "{args:?}");
+
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert!(
+            stderr.contains("is not an option") && stderr.contains(args[0]),
+            "expected the typo to be named; {args:?} gave:\n{stderr}"
+        );
+    }
+}
+
+/// The cost of the rule above, and its escape hatch. A directory whose name
+/// begins with `-` is no longer a bare relative path, but `./` still reaches
+/// it — which is why no `--` marker was added.
+#[test]
+fn a_path_starting_with_a_dash_is_reachable_through_dot_slash() {
+    let root = std::env::temp_dir().join("okf-graph-cli-dash");
+    let bundle = root.join("-weird");
+    std::fs::create_dir_all(&bundle).expect("mkdir");
+    std::fs::copy(fixture("clean/overview.md"), bundle.join("overview.md")).expect("copy");
+
+    let bare = okf_graph()
+        .current_dir(&root)
+        .arg("-weird")
+        .output()
+        .expect("runs");
+    assert_eq!(bare.status.code(), Some(2), "a bare `-weird` is now a typo");
+
+    let escaped = okf_graph()
+        .current_dir(&root)
+        .arg("./-weird")
+        .output()
+        .expect("runs");
+    assert_ne!(
+        escaped.status.code(),
+        Some(2),
+        "`./-weird` must still reach the bundle; stderr: {}",
+        String::from_utf8_lossy(&escaped.stderr)
+    );
+}
+
 /// `--deny` on a tolerated rule is the producer's case: the `dangling` fixture
 /// passes by default and fails once `BUNDLE-2` is denied.
 #[test]
