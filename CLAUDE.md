@@ -155,36 +155,40 @@ not. Say what has to be said, as succinctly as it can be said.
 ## Landing changes
 
 - `main` is **PR-only**: one approving code-owner review, `nix flake check`
-  green, squash-only, through the merge queue. `.github/CODEOWNERS` names both
-  of the org's owner accounts, so a pull request opened by one is approvable by
-  the other and **nothing here bypasses a ruleset any more**. Read that file's
-  comment before treating the approval as review: two accounts held by one
-  operator is a second credential, not a second reviewer.
+  green, squash-only. `.github/CODEOWNERS` names both of the org's owner
+  accounts, so a pull request opened by one is approvable by the other and
+  **nothing here bypasses a ruleset any more**. Read that file's comment before
+  treating the approval as review: two accounts held by one operator is a second
+  credential, not a second reviewer.
 - **Merging is still the owner's explicit ask for that pull request.** Asking
   for a task is not an ask to land the pull requests the task produces. That
   rule outlived the bypass it was written for — the gate is now a real review
   rather than an authority to skip one, and an agent still does not approve its
   own work. This applies to any sub-agent you brief, which will act on whatever
   authority your brief claims for it.
-- **Enqueue with the GraphQL mutation**, because both `gh pr merge` shapes fail
-  against this repo's settings:
-
-  ```sh
-  gh api graphql -f query='mutation($id:ID!){enqueuePullRequest(input:{pullRequestId:$id}){mergeQueueEntry{position state}}}' \
-    -F id="$(gh pr view <pr> --json id --jq .id)"
-  ```
-
-  `gh pr merge <pr> --delete-branch` is refused before any request goes out
-  whenever a merge queue is enabled, and it is redundant regardless, because
-  `delete_branch_on_merge` is on. Plain `gh pr merge <pr>` routes a
-  queue-required merge through `enablePullRequestAutoMerge`, which this repo
-  refuses: `allow_auto_merge` is `false`. Both are properties of the settings
-  rather than of the command, so re-read the settings before believing this
-  paragraph:
+- **Merge with `gh pr merge <pr> --squash --body-file <file>`**, composing the
+  squash body at merge time so it can carry a `Reviewed-by` trailer naming the
+  account that approved. That body **replaces** what
+  `squash_merge_commit_message=COMMIT_MESSAGES` builds from the branch commits
+  rather than appending to it, and the subject still comes from
+  `COMMIT_OR_PR_TITLE` (measured in `okf-model`, 2026-08-18, on a single-commit
+  branch). `--delete-branch` is redundant here: `delete_branch_on_merge` is on.
+  Both are properties of the settings rather than of the command, so re-read
+  them before believing this paragraph:
 
   ```sh
   gh api repos/{owner}/{repo} --jq '{allow_auto_merge, delete_branch_on_merge}'
   ```
+
+- **The merge queue was removed on 2026-08-18, to make that trailer
+  writable.** A queued merge goes through `enqueuePullRequest`, which accepts no
+  commit body, and `gh pr merge --body-file` could not reach the queue either —
+  it routes a queue-required merge through `enablePullRequestAutoMerge`, and
+  this repo sets `allow_auto_merge: false`. So the one repo shape that requires
+  a review was the one that could not record it. The owner accepted the cost:
+  nothing re-tests a pull request against the latest `main` at merge time any
+  more, and `strict_required_status_checks_policy` stays `false`, so a branch
+  can land green on a base that has moved.
 
 ## Deletion & creation
 
