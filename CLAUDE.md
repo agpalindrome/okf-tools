@@ -160,12 +160,15 @@ not. Say what has to be said, as succinctly as it can be said.
   **nothing here bypasses a ruleset any more**. Read that file's comment before
   treating the approval as review: two accounts held by one operator is a second
   credential, not a second reviewer.
-- **Merging is still the owner's explicit ask for that pull request.** Asking
-  for a task is not an ask to land the pull requests the task produces. That
-  rule outlived the bypass it was written for — the gate is now a real review
-  rather than an authority to skip one, and an agent still does not approve its
-  own work. This applies to any sub-agent you brief, which will act on whatever
-  authority your brief claims for it.
+- **The owner's approval is the ask to merge.** A recorded code-owner approval
+  names one pull request, cannot be misremembered, and leaves an artifact, so it
+  is a better version of the signal a spoken request used to carry. Merge on it
+  once CI is green; own owner-authored pull requests only, since an outside
+  contribution goes through a real review rather than the owner's other account.
+- **An approval authorizes the pull request it is on, and no other.** Asking for
+  a task is not an ask to land the pull requests the task produces. This applies
+  to any sub-agent you brief, which will act on whatever authority your brief
+  claims for it — and an agent still does not approve its own work.
 - **Merge with `gh pr merge <pr> --squash --body-file <file>`**, composing the
   squash body at merge time so it can carry a `Reviewed-by` trailer naming the
   account that approved. That body **replaces** what
