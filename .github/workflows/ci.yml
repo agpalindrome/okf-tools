@@ -4,9 +4,6 @@ on:
   push:
     branches: [main]
   pull_request:
-  # The checks must also run on the merge queue's temporary branches, or a
-  # queued PR waits forever for a status that never reports.
-  merge_group:
 
 # Newer pushes to the same branch supersede in-flight runs.
 concurrency:
