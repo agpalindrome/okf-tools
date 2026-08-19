@@ -1,0 +1,11 @@
+extends: substitution
+message: "Use '%s' instead of business abstraction '%s'."
+level: error
+ignorecase: true
+swap:
+  # Anchored to a non-hyphen boundary: "high-leverage" is a compound adjective,
+  # not the verb this bans.
+  (?:^|[\s(])leverage: use
+  utilize: use
+  robust: (say what it actually does)
+  going forward: from now on

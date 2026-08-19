@@ -1,0 +1,18 @@
+extends: existence
+# The ground is that these words add emphasis and no meaning, so the delete
+# test removes them whatever the sense (prose.md, "Cut intensifiers"). The
+# condescension is why that section cuts them harder still, and it applies only
+# where the word modifies an instruction — so the message names both.
+#
+# `simply` in the merely-sense is not a carve-out, unlike `just` in "not just X"
+# (Prose.Merely). Deleting `just` there inverts the sentence, so the word is
+# load-bearing; deleting a merely-sense `simply` changes nothing. Six instances
+# were checked against the delete test on 2026-08-19 and all six were
+# deletable. See `vale/README.md` in agpalindrome/claude.
+message: "'%s' adds emphasis, not meaning, so cut it. Where it modifies an instruction it also tells a stuck reader the thing is easy."
+level: error
+ignorecase: true
+raw:
+  # Requires trailing whitespace, so hyphenated compounds are excluded:
+  # "obviously-correct" is the term of art for a test oracle, not condescension.
+  - \b(simply|obviously)\s

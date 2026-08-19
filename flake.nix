@@ -157,6 +157,130 @@
             };
           };
         };
+
+      # Vale, pinned to the 3.17.1 release binary rather than taken from
+      # nixpkgs. The rules under `.vale/styles` are vendored from
+      # `~/.claude/vale` by that repo's `scripts/sync-vale.sh`, and they are
+      # written and measured against 3.17.x; the nixpkgs this flake locks
+      # carries 3.15.1. That gap is not theoretical — run over this repo's own
+      # prose on 2026-08-19, the two versions disagreed on three lines of
+      # `docs/DESIGN.md`. 3.15.1 flagged a word inside a single-line code span
+      # that 3.17.1 correctly skips, and missed two that 3.17.1 reports. Which
+      # of those is the defect is a question for `agpalindrome/claude`; that
+      # they differ at all is what settles the pin, because a linter disagreeing
+      # with CI is worse than no linter.
+      #
+      # A recorded hash per platform keeps `nix flake check` hermetic, so this
+      # is a fixed-output fetch rather than the unpinned `curl | tar` a plain
+      # CI step would use. Hashes are the release assets' own sha256 digests,
+      # read from the GitHub API for the `v3.17.1` tag.
+      valeVersion = "3.17.1";
+      valeAssets = {
+        x86_64-linux = {
+          name = "Linux_64-bit";
+          hash = "sha256-25R/ifIpLmoDgaYd4VX2pfXLTLRgyheOpBLvYFVZzv0=";
+        };
+        aarch64-linux = {
+          name = "Linux_arm64";
+          hash = "sha256-ktkev57mnsB3N5vpXNCeZxCrM9PVurZrtILmbryA3CM=";
+        };
+        x86_64-darwin = {
+          name = "macOS_64-bit";
+          hash = "sha256-s3q5md/RQU0EG9LpTO0QMpLWNNp2+VTDhb94ncf1+Tk=";
+        };
+        aarch64-darwin = {
+          name = "macOS_arm64";
+          hash = "sha256-gMrPhe8j9Tz913NV7EGm75muwTbxXfs1F3I0gvNVk/k=";
+        };
+      };
+      valeFor =
+        system:
+        let
+          pkgs = nixpkgs.legacyPackages.${system};
+          asset = valeAssets.${system};
+          tarball = pkgs.fetchurl {
+            url = "https://github.com/vale-cli/vale/releases/download/v${valeVersion}/vale_${valeVersion}_${asset.name}.tar.gz";
+            inherit (asset) hash;
+          };
+        in
+        pkgs.runCommandLocal "vale-${valeVersion}" { } ''
+          mkdir -p "$out/bin"
+          tar -xzf ${tarball} -C "$out/bin" vale
+        '';
+
+      # Authored prose against the vendored house style. Errors block and
+      # warnings do not, which is vale's own exit code rather than a flag: it
+      # is errors-only whatever `MinAlertLevel` says.
+      #
+      # `.vale.ini` and `.vale/styles` are vendored, so nothing here edits
+      # them. A rule that fights real writing is a finding for
+      # `agpalindrome/claude`, never a local suppression — a style vendored
+      # into six repos and overridden in each is no longer a shared style.
+      proseFor =
+        system:
+        let
+          pkgs = nixpkgs.legacyPackages.${system};
+          inherit (pkgs.lib) fileset;
+          markdownUnder = fileset.fileFilter (file: file.hasExt "md");
+          # Every `.md` under a `tests/fixtures` directory, and under deon's
+          # `examples/`, is checker *input* rather than writing: they are OKF
+          # Bundles, several malformed on purpose, and linting them would
+          # report a fixture's deliberate defect as a prose defect. Excluded by
+          # path rather than by a name pattern, so a new fixture directory has
+          # to be named here to be skipped — the failure mode of the other
+          # order is prose that silently stops being linted.
+          prose =
+            fileset.difference
+              (fileset.unions [
+                ./CLAUDE.md
+                ./README.md
+                (markdownUnder ./crates)
+                (markdownUnder ./docs)
+              ])
+              (
+                fileset.unions [
+                  ./crates/deon/examples
+                  ./crates/deon/tests/fixtures
+                  ./crates/okf-graph/tests/fixtures
+                ]
+              );
+          src = fileset.toSource {
+            root = ./.;
+            fileset = fileset.unions [
+              prose
+              ./.vale.ini
+              ./.vale
+            ];
+          };
+        in
+        pkgs.runCommandLocal "prose-lint"
+          {
+            nativeBuildInputs = [ (valeFor system) ];
+          }
+          ''
+            cd ${src}
+            # The fileset above put the prose here and nothing else, so this
+            # find *is* the scope decision rather than a second copy of it.
+            files=$(find . -type f -name '*.md' | sed 's|^\./||' | sort)
+            count=$(printf '%s\n' "$files" | grep -c . || true)
+            printf 'prose files to lint: %s\n' "$count"
+            printf '%s\n' "$files"
+
+            # An empty list is never "this repo has no prose" — it means the
+            # fileset broke. vale with no paths reads empty stdin, prints
+            # `0 errors` and exits 0, so without this the check goes green over
+            # nothing. That bug shipped into agpalindrome/claude's CI once.
+            if [ "$count" -eq 0 ]; then
+              echo "prose-lint: no files matched — the fileset is broken, not the prose" >&2
+              exit 1
+            fi
+
+            # --no-global, or vale merges a machine-global styles directory on
+            # top of the vendored one and a local run stops matching CI.
+            printf '%s\n' "$files" | xargs vale --no-global --config .vale.ini
+            touch $out
+          '';
+
       # The reason for `package = pkgs.prek` above is a property of a template
       # this repo neither owns nor tracks, so this installs a real hook from the
       # pinned prek, takes its store path away, and runs it. A prek release that
@@ -199,6 +323,7 @@
         pre-commit = hooksFor system;
         deon-check = deonCheckFor system;
         hook-fallback = hookFallbackFor system;
+        prose = proseFor system;
       });
 
       devShells = forAllSystems (
