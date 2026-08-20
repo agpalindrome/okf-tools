@@ -1,0 +1,69 @@
+extends: substitution
+message: "Oxford British spelling: use '%s', not '%s'."
+level: error
+ignorecase: true
+# Proper nouns, which vale cannot tell from a misspelling. A name is not a
+# spelling and cannot be corrected, so the whole phrase is exempted here rather
+# than reworded. Measured 2026-08-11 with vale 3.17.0: the match is the whole
+# phrase and it is case-sensitive, so a lowercase `iam identity center` and an
+# ordinary `Center the div` are still flagged. `Identity Center` alone was too,
+# until it earned its own entry below. Add a name when prose here trips over it;
+# skip the rule inline for a one-off.
+#
+# Write the gap between the words as `\s+`, never as a literal space. vale
+# compiles every exception holding a space, a tab or `\s` into a separate
+# phrase regex and skips any alert falling inside a match of it — so a literal
+# space matches a space and nothing else, and a name wrapped across two lines
+# was flagged as if it were not on the list. `\s+` spans the newline and
+# changes nothing else: the match is still the whole phrase, still
+# case-sensitive, and still confined to one block, so a name split by a blank
+# line is still flagged. Measured 2026-08-15 with vale 3.17.0, and read from
+# `buildPhraseRe` in `internal/check/definition.go`, which carries the `\s`
+# branch in v3.15.2 through v3.17.0.
+exceptions:
+  - IAM\s+Identity\s+Center # AWS, 2026-08-11
+  - Identity\s+Center # AWS, the short name in prose, 2026-08-12
+  - Bureau\s+of\s+Labor\s+Statistics
+  - Kennedy\s+Space\s+Center
+# `color` keeps its American spelling, like `artifact` before it. Decided
+# 2026-08-19 on agpalindrome/claude#65, after wiring the gate into okf-tools
+# produced 46 errors on writing that is correct as it stands — 46 of 49, across
+# seven of eleven files. There `color` names a Rust type, a field and two
+# grammar productions, appearing 121 times in the sources and 60 in the prose
+# describing them, so correcting the prose would leave every sentence spelling
+# the identifier it explains a different way. prose.md's precise-technical-terms
+# rule outranks the spelling rule, which is the same ground `artifact` stands on
+# and a stronger claim: a reader can grep for this one.
+#
+# The swap is removed rather than excepted. An exception takes a phrase, so it
+# cannot express "when this word names an identifier", and the two alternatives
+# both cost more than they buy: an inline skip at 46 sites is noise in the file
+# that argues the design, and a repo-scoped override would report as drift on
+# every sync-vale.sh --check.
+swap:
+  # Match only the American form. An optional `u` also matches the correct
+  # British spelling, and it fires whenever the replacement text differs from
+  # the match — which `favourite(s)` does, because of the literal "(s)".
+  # Measured 2026-08-10: `favou?rites?` flagged a correct "favourite" in a
+  # published post, while `colou?red` stayed silent only by accident.
+  behaviors?: behaviour(s)
+  favorites?: favourite(s)
+  labor: labour
+  honor: honour
+  centers?: centre(s)
+  centered: centred
+  defense: defence
+  offense: offence
+  gray: grey
+  traveled: travelled
+  traveling: travelling
+  modeled: modelled
+  modeling: modelling
+  canceled: cancelled
+  canceling: cancelling
+  labeled: labelled
+  labeling: labelling
+  fulfill: fulfil
+  analyze: analyse
+  analyzed: analysed
+  analyzing: analysing

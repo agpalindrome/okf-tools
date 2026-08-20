@@ -1,0 +1,6 @@
+extends: existence
+message: "'%s' hides the actor in an instruction. Say who does it."
+level: warning
+ignorecase: true
+raw:
+  - \b(should|must|shall|needs? to|has to|have to|is to|are to)\s+be\s+\w+(ed|en)\b

@@ -1,0 +1,9 @@
+extends: existence
+message: "Cut the intensifier '%s'."
+level: error
+ignorecase: true
+tokens:
+  - very
+  - really
+  - quite
+  - extremely

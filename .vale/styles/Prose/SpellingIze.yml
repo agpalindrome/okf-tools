@@ -1,0 +1,6 @@
+extends: existence
+message: "Oxford British takes '-ize', not '-ise', here: '%s'."
+level: error
+ignorecase: true
+raw:
+  - \b(organi|authori|reali|recogni|generali|materiali|canonicali|speciali|prioriti|summari|standardi|minimi|maximi|normali|seriali|deseriali|initiali|optimi|emphasi|characteri|categori|formali|centrali|decentrali|visuali|synchroni|parameteri|moneti|amorti|monopoli|criticali|capitali|utili)s(e|es|ed|ing|ation|ations|able)\b

@@ -22,7 +22,7 @@ mechanical tests, to see whether the spike-1 feature list holds or grows.
 | Criterion | Color | Note |
 | --- | --- | --- |
 | ownership transfers by end of term | mechanical (contract fact) | decidable from an input flag |
-| purchase option reasonably certain | judgment | probabilistic lessee-behavior assessment |
+| purchase option reasonably certain | judgment | probabilistic lessee-behaviour assessment |
 | term ≥ major part of economic life | **regime-dependent** | ASC 840: `≥ 0.75` mechanical; IAS 17: "major part" judgment |
 | PV of payments ≥ substantially all of fair value | **regime-dependent** | ASC 840: `≥ 0.90` mechanical; IAS 17: judgment |
 | specialized asset, no alternative use | judgment | same concept as IFRS 15.35(c) |
@@ -44,7 +44,7 @@ under ASC 840 and pure judgment ("major part") under IAS 17. Whether a criterion
 is a bright line or a judgment is a _standard-setter's policy choice to mechanize
 a judgment_. The language must color the threshold constant itself and scope the
 whole norm by regime. Strongest demonstration: under IFRS 16 the lessee
-classification norm **does not exist at all** — a norm's very existence is
+classification norm **does not exist at all** — a norm's existence is
 regime-relative.
 
 **Refinements (not new features):**

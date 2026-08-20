@@ -13,7 +13,7 @@ Two hypotheses, one piece of work:
    shelf — revenue and leases, the two most-formalized standards in existence,
    both with clean subject-level state machines. Everything built so far has
    only been tested on cases it was designed from.
-2. **Is deon's bottom edge really Pacioli's seam?** The repos assert it; nothing
+2. **Is deon's bottom edge Pacioli's seam?** The repos assert it; nothing
    exercises it. IAS 32 is the cheapest possible test, because its commitment is
    a classification verdict — precisely the argument Pacioli's injected
    `classify : α → AccountClass` wants (`Pacioli/Classification.lean`, whose own

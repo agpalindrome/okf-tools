@@ -1,0 +1,6 @@
+extends: existence
+message: "'%s' is often condescending, but reads as 'merely' in 'not just'. Judge it."
+level: warning
+ignorecase: true
+tokens:
+  - just

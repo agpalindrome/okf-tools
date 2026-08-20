@@ -136,6 +136,16 @@ stays useful.
 - **Docs lint at 80 columns**, and emphasis style must be *consistent within
   each file* (MD049 infers it from the first use — `docs/DESIGN.md` is
   underscore, this file is asterisk). Both bite often.
+- **Prose lints against the shared house style**, as `checks.prose` — vale
+  3.17.1 over `.vale.ini` and `.vale/styles`, both vendored from
+  `agpalindrome/claude` by that repo's `scripts/sync-vale.sh`. Scope is
+  authored prose: this file, both READMEs, the CHANGELOG, and `docs/`. Every
+  `.md` under a `tests/fixtures` directory and under `crates/deon/examples` is
+  checker input rather than writing, so the check excludes it by path. Errors
+  block and warnings do not. **Nothing here edits the vendored rules** — a rule
+  that fights real writing is a finding for `agpalindrome/claude`, because a
+  style vendored into six repos and overridden in each has stopped being
+  shared.
 
 ## Comments
 
