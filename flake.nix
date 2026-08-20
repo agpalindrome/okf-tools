@@ -198,15 +198,36 @@
         let
           pkgs = nixpkgs.legacyPackages.${system};
           asset = valeAssets.${system};
-          tarball = pkgs.fetchurl {
+        in
+        pkgs.stdenvNoCC.mkDerivation {
+          pname = "vale";
+          version = valeVersion;
+          src = pkgs.fetchurl {
             url = "https://github.com/vale-cli/vale/releases/download/v${valeVersion}/vale_${valeVersion}_${asset.name}.tar.gz";
             inherit (asset) hash;
           };
-        in
-        pkgs.runCommandLocal "vale-${valeVersion}" { } ''
-          mkdir -p "$out/bin"
-          tar -xzf ${tarball} -C "$out/bin" vale
-        '';
+          # The tarball is flat: LICENSE, README.md, vale.
+          sourceRoot = ".";
+          # The Linux releases are dynamically linked and carry no RUNPATH, so
+          # dropping the binary into $out/bin unpatched produces one that cannot
+          # run under Nix — and the failure names the wrong thing. Read from the
+          # x86_64 release binary on 2026-08-19: PT_INTERP is
+          # /lib64/ld-linux-x86-64.so.2, which no Nix environment has, and
+          # DT_NEEDED lists libstdc++.so.6 and libgcc_s.so.1 beside glibc. The
+          # kernel then fails the exec with ENOENT *about the interpreter*, and
+          # every layer above renders that as `vale: No such file or directory`
+          # — a message that reads as a missing vale, and sent one search after
+          # the fileset instead. autoPatchelfHook supplies both the interpreter
+          # and the RUNPATH; the macOS builds need neither.
+          nativeBuildInputs = pkgs.lib.optional pkgs.stdenv.hostPlatform.isLinux pkgs.autoPatchelfHook;
+          buildInputs = pkgs.lib.optional pkgs.stdenv.hostPlatform.isLinux pkgs.stdenv.cc.cc.lib;
+          dontStrip = true;
+          installPhase = ''
+            runHook preInstall
+            install -Dm755 vale $out/bin/vale
+            runHook postInstall
+          '';
+        };
 
       # Authored prose against the vendored house style. Errors block and
       # warnings do not, which is vale's own exit code rather than a flag: it
