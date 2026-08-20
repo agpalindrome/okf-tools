@@ -98,8 +98,8 @@ says to tolerate.
 The distinction is the spec's, not an ergonomic nicety. OKF's consumption model
 is permissive ([§11]) and names cases a consumer **MUST NOT** reject over:
 
-- a **dangling link** — [§6] requires tolerating a broken link, which "may
-  simply represent not-yet-written knowledge";
+- a **dangling link** — [§6] requires tolerating a broken link, which may
+  represent "not-yet-written knowledge";
 - a **missing optional family** — [§5.3] / [§11] forbid rejecting a concept for
   lacking provenance, trust, or lifecycle metadata.
 
