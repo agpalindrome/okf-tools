@@ -101,18 +101,18 @@ pub enum Rule {
     /// it, and §11's list of what a consumer must tolerate does not reach a
     /// malformed one.
     MalformedTimestamp,
-    /// CONCEPT-13: `stale_after` is present but not a `YYYY-MM-DD` date (§5.5).
+    /// CONCEPT-13: `stale_after` is present but not an RFC 3339 datetime (§5.5).
     /// A defect, on the same reading as CONCEPT-12: §5.5 states the format, and
     /// a staleness decision a consumer cannot make is worse than an absent one.
     MalformedStaleAfter,
     /// CONCEPT-14: a §5.1 credibility signal is present but unusable — a
-    /// `last_modified` or `usage_window` bound that is not `YYYY-MM-DD`, or a
-    /// `usage_count` that is not an integer. A report, matching CONCEPT-9 and
-    /// CONCEPT-10: these are supporting signals a consumer weighs, not a
+    /// `last_modified` or `usage_window` bound that is not an RFC 3339
+    /// datetime, or a `usage_count` that is not an integer. A report, matching
+    /// CONCEPT-9 and CONCEPT-10: these are supporting signals a consumer weighs, not a
     /// required core it needs.
     MalformedSourceSignal,
-    /// CONCEPT-15: `stale_after` names a day that has arrived — §5.5's
-    /// `today >= stale_after`. A report, and the only rule whose answer depends
+    /// CONCEPT-15: `stale_after` names an instant that has arrived — §5.5's
+    /// `now >= stale_after`. A report, and the only rule whose answer depends
     /// on something outside the bundle: a stale concept is a true statement
     /// about a conformant document, the class BUNDLE-2 is in, and the spec's own
     /// worked example (Appendix A) ships a concept past its date. `--deny

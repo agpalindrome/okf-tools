@@ -25,9 +25,10 @@ Every rule the spec makes checkable ships as a _located finding_, at two levels:
 - **Per-concept** reads a single document against [§4]'s shape and the optional
   [§5] families — a present, non-empty `type`; frontmatter field shapes; the
   provenance / trust / lifecycle metadata; the actor convention ([§7]); the
-  `generated.at` and `verified[].at` timestamps, read as RFC 3339; the
-  `YYYY-MM-DD` dates of `stale_after` and the credibility signals, and whether
-  a `stale_after` has arrived ([§5.5]); and the Attested-Computation contract
+  timestamps, read as RFC 3339 — `generated.at` and `verified[].at`, and
+  `stale_after` and the credibility signals, which §5 has made datetimes as
+  well — and whether a `stale_after` has arrived ([§5.5]); and the
+  Attested-Computation contract
   ([§10]).
 - **Whole-bundle** reads the graph — unique Concept IDs and reserved-file
   exclusion, body-link resolution, the path-valued fields and the `references/`
@@ -41,25 +42,27 @@ fail the run; only defects do. The full model — the edge kinds and why acyclic
 is checked per kind, the defect/report cut, the deferred boundary — is in the
 [design note][design].
 
-## Staleness, and the day it is read against
+## Staleness, and the instant it is read against
 
 One rule asks a question the bundle alone does not answer. [§5.5] defines a
-concept as stale when `today >= stale_after`, so `CONCEPT-15` is a function of
-the bundle _and_ a date. It is a report: a stale concept is still conformant,
+concept as stale when `now >= stale_after`, so `CONCEPT-15` is a function of
+the bundle _and_ an instant. It is a report: a stale concept is still conformant,
 and the spec's own [worked example][appendix-a] ships one past its date.
 
-The day is an argument rather than a call to the clock. `--as-of 2026-08-15`
-pins it — which is what makes a CI run reproducible, and what lets a producer
-ask what goes stale next quarter — and it defaults to today in UTC. In the
-library it is `Bundle::stale_as_of(day)`, deliberately outside `Bundle::load`:
+The instant is an argument rather than a call to the clock.
+`--as-of 2026-08-15T00:00:00Z` pins it — which is what makes a CI run
+reproducible, and what lets a producer ask what goes stale next quarter — and it
+defaults to now. In the library it is `Bundle::stale_as_of(now)`, deliberately
+outside `Bundle::load`:
 every other finding is a function of the tree, so a bundle that loads clean
 loads clean forever, and a clock inside `load` would put a quiet expiry date on
 every fixture anyone writes.
 
 ```sh
 # Reported, and the run still passes — the concept conforms.
-nix run .#okf-graph -- --as-of 2026-08-15 crates/okf-graph/tests/fixtures/stale
-# expired.md  CONCEPT-15 (stale concept): stale as of 2026-08-15: …
+nix run .#okf-graph -- --as-of 2026-08-15T00:00:00Z \
+  crates/okf-graph/tests/fixtures/stale
+# expired.md  CONCEPT-15 (stale concept): stale as of 2026-08-15T00:00:00Z: …
 
 # Unless the bundle is yours and stale is a failure (exit 1).
 nix run .#okf-graph -- --deny CONCEPT-15 crates/okf-graph/tests/fixtures/stale

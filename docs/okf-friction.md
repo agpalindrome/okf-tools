@@ -171,6 +171,31 @@ anywhere in the spec. It also makes the fields unsafe to order, which is what
 comparing `verified` against `generated` exists to do. **Not raised upstream**
 (2026-08-08); raising it is the owner's call.
 
+**Widened, not answered** (2026-09-21). The 2026-08-20 edit made every §5
+timestamp "an ISO 8601 datetime with an explicit UTC offset", so `stale_after`
+and the §5.1 signals joined `at` under the same unnarrowed wording. okf-graph
+applies the same RFC 3339 reading to all of them. The question stands, and now
+covers five fields rather than two.
+
+## 2026-09-21 — the text changes under an unchanged version string
+
+The 2026-08-20 edit changed what a conformant bundle looks like: a
+`stale_after: 2026-12-31` that satisfied §5.5 before it does not satisfy it
+after. The spec still reads "Version 0.2", and its §13 lists no change. A
+bundle's `okf_version: 0.2` (§12) therefore no longer says which text it was
+written to, and a consumer cannot tell a bundle written to the old text from
+one that is non-conformant under the new text.
+
+**How okf-graph handles it.** It follows the current text: a bare date is
+malformed, and the detail names the missing time and offset so an author
+migrating knows why. It does not guess at the author's intent from the value's
+shape, because accepting the old form would reintroduce the per-timezone
+ambiguity the edit was made to remove.
+
+**The question for upstream.** Should a normative change bump the version, or
+at least be listed in §13? **Not raised upstream** (2026-09-21); raising it is
+the owner's call.
+
 [pr232]: https://github.com/GoogleCloudPlatform/knowledge-catalog/pull/232
 [s11]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md#11-conformance
 [issue]: https://github.com/GoogleCloudPlatform/knowledge-catalog/issues/234

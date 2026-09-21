@@ -149,12 +149,12 @@ impl Frontmatter {
         }
     }
 
-    /// `stale_after` — the absolute `YYYY-MM-DD` date on or after which the
-    /// concept is stale (§5.5), kept as written so a malformed one can be
-    /// reported; [`Date::parse`] turns it into a value. Whether today is past it
-    /// stays a consumer's question.
+    /// `stale_after` — the absolute instant on or after which the concept is
+    /// stale (§5.5), kept as written so a malformed one can be reported;
+    /// [`Timestamp::parse`] turns it into a value. Whether now is past it stays
+    /// a consumer's question.
     ///
-    /// [`Date::parse`]: crate::Date::parse
+    /// [`Timestamp::parse`]: crate::Timestamp::parse
     pub fn stale_after(&self) -> Option<String> {
         self.scalar("stale_after")
     }
@@ -362,19 +362,19 @@ pub struct Source {
     /// `usage_count: many` is indistinguishable from an absent one, and a signal
     /// nothing can read is worth saying out loud (§5.1).
     pub usage_count_malformed: bool,
-    /// When the source itself last changed (`YYYY-MM-DD`), as written.
+    /// When the source itself last changed (a datetime), as written.
     pub last_modified: Option<String>,
     /// A per-source `{ from, to }` range overriding the shared one.
     pub usage_window: Option<UsageWindow>,
 }
 
-/// The `{ from, to }` date range that frames a `usage_count` (§5.1).
+/// The `{ from, to }` datetime range that frames a `usage_count` (§5.1).
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct UsageWindow {
-    /// Start of the window (`YYYY-MM-DD`), as written.
+    /// Start of the window (a datetime), as written.
     pub from: Option<String>,
-    /// End of the window (`YYYY-MM-DD`), as written.
+    /// End of the window (a datetime), as written.
     pub to: Option<String>,
 }
 

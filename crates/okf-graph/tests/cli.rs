@@ -178,15 +178,15 @@ fn the_end_of_options_marker_is_declined_by_name() {
 
 /// The same rule in the value position. `--deny --qiuet CODE` used to report
 /// that no rule has the code `--qiuet`, which names the rule table for what is
-/// a forgotten argument or a mistyped flag. No rule code or date begins with a
-/// dash, so nothing legitimate is caught.
+/// a forgotten argument or a mistyped flag. No rule code or datetime begins with
+/// a dash, so nothing legitimate is caught.
 #[test]
 fn a_flag_argument_that_looks_like_an_option_is_rejected() {
     let cases: [(&[&str], &str); 4] = [
         (&["--deny", "--qiuet"], "rule code"),
         (&["--warn", "--quiet"], "rule code"),
         (&["--allow", "-h"], "rule code"),
-        (&["--as-of", "--quiet"], "date"),
+        (&["--as-of", "--quiet"], "datetime"),
     ];
 
     for (args, expected) in cases {
@@ -323,13 +323,13 @@ fn an_unknown_rule_code_exits_two() {
     assert_eq!(missing.status.code(), Some(2));
 }
 
-/// `--as-of` pins the day §5.5 is read against, so a run is reproducible: the
-/// same bundle is stale on one day and clean on the day before, and neither
-/// answer moves with the machine's clock.
+/// `--as-of` pins the instant §5.5 is read against, so a run is reproducible:
+/// the same bundle is stale at one instant and clean at an earlier one, and
+/// neither answer moves with the machine's clock.
 #[test]
-fn as_of_pins_the_day_staleness_is_read_against() {
+fn as_of_pins_the_instant_staleness_is_read_against() {
     let stale = okf_graph()
-        .args(["--as-of", "2026-08-15"])
+        .args(["--as-of", "2026-08-15T00:00:00Z"])
         .arg(fixture("stale"))
         .output()
         .expect("runs");
@@ -347,7 +347,7 @@ fn as_of_pins_the_day_staleness_is_read_against() {
     );
 
     let earlier = okf_graph()
-        .args(["--as-of", "2025-12-31"])
+        .args(["--as-of", "2025-12-31T00:00:00Z"])
         .arg(fixture("stale"))
         .output()
         .expect("runs");
@@ -360,7 +360,7 @@ fn as_of_pins_the_day_staleness_is_read_against() {
 #[test]
 fn denying_staleness_fails_the_run() {
     let output = okf_graph()
-        .args(["--deny", "CONCEPT-15", "--as-of", "2026-08-15"])
+        .args(["--deny", "CONCEPT-15", "--as-of", "2026-08-15T00:00:00Z"])
         .arg(fixture("stale"))
         .output()
         .expect("runs");
@@ -373,16 +373,19 @@ fn denying_staleness_fails_the_run() {
     );
 }
 
-/// An `--as-of` that is not a date is a usage error, like a mistyped rule code:
-/// silently falling back to today would answer a question nobody asked.
+/// An `--as-of` that is not a datetime is a usage error, like a mistyped rule
+/// code: silently falling back to now would answer a question nobody asked. A
+/// bare date is one too, for the reason §5 gives: it names no single instant.
 #[test]
 fn a_malformed_as_of_exits_two() {
-    let bad = okf_graph()
-        .args(["--as-of", "15-08-2026"])
-        .arg(fixture("stale"))
-        .output()
-        .expect("runs");
-    assert_eq!(bad.status.code(), Some(2));
+    for value in ["15-08-2026", "2026-08-15"] {
+        let bad = okf_graph()
+            .args(["--as-of", value])
+            .arg(fixture("stale"))
+            .output()
+            .expect("runs");
+        assert_eq!(bad.status.code(), Some(2), "{value}");
+    }
 
     let missing = okf_graph().arg("--as-of").output().expect("runs");
     assert_eq!(missing.status.code(), Some(2));
