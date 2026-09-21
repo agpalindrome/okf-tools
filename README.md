@@ -43,4 +43,4 @@ Unless you state otherwise, a contribution you submit for inclusion in this
 work, as defined in Apache-2.0, is dual licensed as above with no additional
 terms.
 
-[okf]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md
+[okf]: https://github.com/GoogleCloudPlatform/open-knowledge-format/blob/main/SPEC.md

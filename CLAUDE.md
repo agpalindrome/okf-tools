@@ -11,7 +11,7 @@ It is a working reference, not a settled spec, and it is edited as work
 proceeds; per-repo authoritative documentation replaces it as each repo is
 built out.
 
-[okf]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md
+[okf]: https://github.com/GoogleCloudPlatform/open-knowledge-format/blob/main/SPEC.md
 [board]: https://github.com/orgs/ojhermann-org/projects/8
 
 ## The crates, and the boundary between them
@@ -50,6 +50,11 @@ semantics, and both are upstream of anything built on them.
   lists the changes: `timestamp` → `generated.at`, `# Citations` → `sources`,
   plus the new §5 and §10 families). Read the "Changes from" section, fix what
   went stale, file what is newly modellable.
+- **The spec lives in `GoogleCloudPlatform/open-knowledge-format`** since
+  2026-08-21. The copy under `knowledge-catalog/okf/` is a frozen snapshot;
+  link and read against the new repo. Upstream also edits the text in place
+  under an unchanged version string, so "v0.2" names no fixed text — watch
+  its history, not §13 alone.
 
 ## Scope: the tools, not the knowledge
 

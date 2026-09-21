@@ -18,7 +18,7 @@
 //! the provenance, trust, and lifecycle families (§5) this crate does not read
 //! yet.
 //!
-//! [spec]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md#4-concept-documents
+//! [spec]: https://github.com/GoogleCloudPlatform/open-knowledge-format/blob/main/SPEC.md#4-concept-documents
 
 use std::fmt;
 

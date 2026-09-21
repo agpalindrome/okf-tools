@@ -5,7 +5,11 @@ recorded with the date they surfaced (`CLAUDE.md`, "Deletion & creation"). This
 is raw material for an eventual upstream conversation; whether and how to raise
 any item is the owner's call.
 
-[spec]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md
+The spec moved to `GoogleCloudPlatform/open-knowledge-format` on 2026-08-21.
+Issues and pull requests cited below as `knowledge-catalog#N` were filed before
+the move and stay where they were filed.
+
+[spec]: https://github.com/GoogleCloudPlatform/open-knowledge-format/blob/main/SPEC.md
 
 ## 2026-07-26 — the actor convention (§7) excludes its own §5.1 example
 
@@ -172,14 +176,14 @@ comparing `verified` against `generated` exists to do. **Not raised upstream**
 (2026-08-08); raising it is the owner's call.
 
 [pr232]: https://github.com/GoogleCloudPlatform/knowledge-catalog/pull/232
-[s11]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md#11-conformance
+[s11]: https://github.com/GoogleCloudPlatform/open-knowledge-format/blob/main/SPEC.md#11-conformance
 [issue]: https://github.com/GoogleCloudPlatform/knowledge-catalog/issues/234
 [issue-235]: https://github.com/GoogleCloudPlatform/knowledge-catalog/issues/235
 [issue-236]: https://github.com/GoogleCloudPlatform/knowledge-catalog/issues/236
-[s62]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md#62-path-valued-fields
-[s7]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md#7-actor-convention
-[s51]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md#51-provenance-sources
-[s52]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md#52-trust-generated-and-verified
-[s102]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md#102-contract-fields
-[s103]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md#103-the-computation
-[s9]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md#9-log-files
+[s62]: https://github.com/GoogleCloudPlatform/open-knowledge-format/blob/main/SPEC.md#62-path-valued-fields
+[s7]: https://github.com/GoogleCloudPlatform/open-knowledge-format/blob/main/SPEC.md#7-actor-convention
+[s51]: https://github.com/GoogleCloudPlatform/open-knowledge-format/blob/main/SPEC.md#51-provenance-sources
+[s52]: https://github.com/GoogleCloudPlatform/open-knowledge-format/blob/main/SPEC.md#52-trust-generated-and-verified
+[s102]: https://github.com/GoogleCloudPlatform/open-knowledge-format/blob/main/SPEC.md#102-contract-fields
+[s103]: https://github.com/GoogleCloudPlatform/open-knowledge-format/blob/main/SPEC.md#103-the-computation
+[s9]: https://github.com/GoogleCloudPlatform/open-knowledge-format/blob/main/SPEC.md#9-log-files
