@@ -5,8 +5,8 @@ sources:
     resource: https://developers.google.com/analytics/bigquery/export-schema
     usage_count: many
     last_modified: 30-05-2026
-    usage_window: { from: 2026-06-01, to: 2026-06-31 }
-usage_window: { from: 2026-06-01, to: not-a-date }
+    usage_window: { from: 2026-06-01T00:00:00Z, to: 2026-06-31T00:00:00Z }
+usage_window: { from: 2026-06-01T00:00:00Z, to: not-a-date }
 ---
 
 # Signals

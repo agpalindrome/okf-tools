@@ -117,11 +117,11 @@ tolerated report. This section is the shape, not the registry.
 families: `type` present and non-empty ([§11]); the field shapes of [§4.1]; the
 provenance, trust, and lifecycle families ([§5]) — a `sources` entry's required
 `resource`, the `verified` singleton that counts as one and not zero ([§5.2]),
-the actor convention ([§7]), the `at` timestamps read as RFC 3339 rather than as
+the actor convention ([§7]), every §5 timestamp read as RFC 3339 rather than as
 ISO 8601 entire (see the [friction log](okf-friction.md)), `status` /
 `stale_after` ([§5.4], [§5.5]), and the credibility signals a consumer computes
 with — `usage_count` an integer, `last_modified` and each `usage_window` bound a
-real `YYYY-MM-DD` day; and
+real datetime; and
 the Attested-Computation contract ([§10]) — `runtime`, typed `parameters`, and
 the computation-or-fence exclusivity ([§10.3]).
 
@@ -135,19 +135,20 @@ the reserved `index.md` and `log.md` ([§8], [§9]), including a declared
 ### 6.1 The one finding that is not a function of the bundle
 
 [§5.5] does not leave staleness to a reading — it states the predicate, _"a
-concept is stale when `today >= stale_after`"_ — and [§10.5] says what a
+concept is stale when `now >= stale_after`"_ (`today`, over a bare date, until
+the 2026-08-20 edit) — and [§10.5] says what a
 consumer does about it. So `CONCEPT-15` is checked, and it is the only rule
 whose answer depends on something outside the tree.
 
 That dependency is made an argument rather than a call to the clock.
-`Bundle::stale_as_of(day)` sits beside `Bundle::check` and outside
+`Bundle::stale_as_of(now)` sits beside `Bundle::check` and outside
 `Bundle::load`, so every finding `load` produces stays a pure function of the
 bundle: a fixture that loads clean loads clean forever, and a red fixture stays
 red on the day it was written and on every day after. Putting the clock inside
 `load` would have been the shorter change and would have hung an expiry date on
-the test suite — this crate's own `clean` fixture declares
-`stale_after: 2026-12-31`, so the suite would have started reporting on a date
-nobody had marked in it.
+the test suite — this crate's own `clean` fixture declares a `stale_after` at
+the end of 2026, so the suite would have started reporting on a date nobody had
+marked in it.
 
 It is a _report_, not a defect. A stale concept is a true statement about a
 conformant document — the class `BUNDLE-2` is in — and rejecting a bundle over

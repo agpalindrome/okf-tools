@@ -3,6 +3,28 @@
 Notable changes to `okf-graph`, newest first. The crate is pre-1.0: a minor bump
 may break the API, and an MSRV change is one of the things that earns it.
 
+## Unreleased
+
+### Changed
+
+- **`stale_after`, `sources[].last_modified` and every `usage_window` bound
+  are read as RFC 3339 datetimes, not `YYYY-MM-DD` dates.** OKF's 2026-08-20
+  edit made every §5 timestamp "an ISO 8601 datetime with an explicit UTC
+  offset", under an unchanged v0.2 version string. A bundle written to the
+  current text used to draw `CONCEPT-13` and `CONCEPT-14` findings for every
+  such field, and one written to the old text passed. That is now reversed:
+  a bare date draws the same findings, with a detail saying it lacks a time
+  and offset. It is not read as midnight UTC, because which midnight is the
+  ambiguity the edit removed.
+- **Staleness compares instants.** `Bundle::stale_as_of` takes a `Timestamp`,
+  §5.5 now reads `now >= stale_after`, and `--as-of` takes an RFC 3339
+  datetime, so a bare date is a usage error (exit 2).
+
+### Removed
+
+- `Date`, with `Date::today`. Nothing reads a calendar day any more;
+  `Timestamp::now` and `Timestamp`'s `Display` replace them.
+
 ## 0.5.0 — 2026-08-16
 
 ### Changed

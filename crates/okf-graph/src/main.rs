@@ -15,7 +15,7 @@
 use std::path::Path;
 use std::process::ExitCode;
 
-use okf_graph::{Bundle, Date, Finding, Level, Policy, Rule};
+use okf_graph::{Bundle, Finding, Level, Policy, Rule, Timestamp};
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -33,7 +33,7 @@ const USAGE: &str = "\
 okf-graph — structural / topological validator for an OKF Knowledge Bundle
 
 Usage:
-    okf-graph [--quiet] [--allow-empty] [--as-of <DATE>]
+    okf-graph [--quiet] [--allow-empty] [--as-of <TIME>]
               [--deny|--warn|--allow <CODE>]... <bundle>
 
 Arguments:
@@ -45,8 +45,8 @@ Options:
     --warn <CODE>  print this rule but do not fail on it
     --allow <CODE> do not report this rule at all
     --allow-empty  accept a bundle holding no concepts
-    --as-of <DATE> the `YYYY-MM-DD` day to read `stale_after` against
-                   (default: today, UTC)
+    --as-of <TIME> the RFC 3339 instant to read `stale_after` against,
+                   e.g. `2026-08-15T00:00:00Z` (default: now)
     --quiet        print findings only (suppress the summary line)
     -h, --help     show this help
     -V, --version  show the version
@@ -70,16 +70,17 @@ mistyped path or a bundle that failed to generate would otherwise produce a
 green run indistinguishable from a valid one. Pass `--allow-empty` where an
 empty bundle is expected.
 
-CONCEPT-15 is the one rule whose answer depends on the day: §5.5 says a concept
-is stale when `today >= stale_after`. It is a report, since a stale concept is
-still conformant — `--deny CONCEPT-15` gates on it, and `--as-of` asks the
-question about another day, which is also what keeps a CI run reproducible.";
+CONCEPT-15 is the one rule whose answer depends on the clock: §5.5 says a
+concept is stale when `now >= stale_after`. It is a report, since a stale
+concept is still conformant — `--deny CONCEPT-15` gates on it, and `--as-of`
+asks the question about another instant, which is also what keeps a CI run
+reproducible.";
 
 fn main() -> ExitCode {
     let mut quiet = false;
     let mut allow_empty = false;
     let mut policy = Policy::new();
-    let mut as_of: Option<Date> = None;
+    let mut as_of: Option<Timestamp> = None;
     let mut bundle_path: Option<String> = None;
     let mut args = std::env::args().skip(1);
 
@@ -99,19 +100,21 @@ fn main() -> ExitCode {
             "--quiet" => quiet = true,
             "--allow-empty" => allow_empty = true,
             "--as-of" => {
-                let Some(date) = args.next() else {
-                    eprintln!("error: --as-of needs a date, e.g. `--as-of 2026-08-15`");
+                let Some(time) = args.next() else {
+                    eprintln!(
+                        "error: --as-of needs a datetime, e.g. `--as-of 2026-08-15T00:00:00Z`"
+                    );
                     return ExitCode::from(2);
                 };
-                if looks_like_an_option(&date) {
-                    eprintln!("error: --as-of needs a date, but `{date}` looks like an option");
+                if looks_like_an_option(&time) {
+                    eprintln!("error: --as-of needs a datetime, but `{time}` looks like an option");
                     return ExitCode::from(2);
                 }
-                let Some(date) = Date::parse(&date) else {
-                    eprintln!("error: `{date}` is not a `YYYY-MM-DD` date");
+                let Some(parsed) = Timestamp::parse(&time) else {
+                    eprintln!("error: `{time}` is not an RFC 3339 datetime");
                     return ExitCode::from(2);
                 };
-                as_of = Some(date);
+                as_of = Some(parsed);
             }
             "--deny" | "--warn" | "--allow" => {
                 let level = match arg.as_str() {
@@ -211,7 +214,7 @@ fn main() -> ExitCode {
     // Staleness is asked separately because it is the one question the bundle
     // alone does not answer (§5.5), and the answer joins the rest here rather
     // than in a second summary a reader would have to add up themselves.
-    let staleness = bundle.stale_as_of(as_of.unwrap_or_else(Date::today));
+    let staleness = bundle.stale_as_of(as_of.unwrap_or_else(Timestamp::now));
     let found: Vec<&Finding> = bundle.findings().iter().chain(staleness.iter()).collect();
     let findings: Vec<&Finding> = found
         .iter()

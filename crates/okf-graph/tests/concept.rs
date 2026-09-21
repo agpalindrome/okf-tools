@@ -241,17 +241,18 @@ fn a_field_of_the_wrong_shape_reads_as_absent() {
 }
 
 /// The lifecycle families (§5.4/§5.5) read back: `status` as an enum, and
-/// `stale_after` as the raw date string.
+/// `stale_after` as the raw datetime string.
 #[test]
 fn reads_lifecycle_status_and_stale_after() {
-    let concept =
-        Concept::parse("---\ntype: Reference\nstatus: deprecated\nstale_after: 2026-09-23\n---\n")
-            .expect("parses");
+    let concept = Concept::parse(
+        "---\ntype: Reference\nstatus: deprecated\nstale_after: 2026-09-23T00:00:00Z\n---\n",
+    )
+    .expect("parses");
 
     assert_eq!(concept.frontmatter().status(), Some(Status::Deprecated));
     assert_eq!(
         concept.frontmatter().stale_after().as_deref(),
-        Some("2026-09-23")
+        Some("2026-09-23T00:00:00Z")
     );
 }
 
@@ -389,8 +390,8 @@ sources:
     resource: https://example.com/schema
     author: team:ga4-docs
     usage_count: 5000
-    last_modified: 2026-05-30
-usage_window: { from: 2026-06-01, to: 2026-06-30 }
+    last_modified: 2026-05-30T00:00:00Z
+usage_window: { from: 2026-06-01T00:00:00Z, to: 2026-06-30T00:00:00Z }
 ---
 ";
     let concept = Concept::parse(src).expect("parses");
@@ -405,11 +406,14 @@ usage_window: { from: 2026-06-01, to: 2026-06-30 }
     );
     assert_eq!(sources[0].author.as_deref(), Some("team:ga4-docs"));
     assert_eq!(sources[0].usage_count, Some(5000));
-    assert_eq!(sources[0].last_modified.as_deref(), Some("2026-05-30"));
+    assert_eq!(
+        sources[0].last_modified.as_deref(),
+        Some("2026-05-30T00:00:00Z")
+    );
 
     let window = front.usage_window().expect("shared usage_window");
-    assert_eq!(window.from.as_deref(), Some("2026-06-01"));
-    assert_eq!(window.to.as_deref(), Some("2026-06-30"));
+    assert_eq!(window.from.as_deref(), Some("2026-06-01T00:00:00Z"));
+    assert_eq!(window.to.as_deref(), Some("2026-06-30T00:00:00Z"));
 }
 
 /// The Attested Computation contract (§10.2) reads back — runtime, the typed

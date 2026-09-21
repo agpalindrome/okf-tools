@@ -48,4 +48,4 @@ pub use links::{links_in, Link, LinkKind};
 pub use paths::{classify_path, resolve_path, PathKind};
 pub use policy::{Level, Policy};
 pub use provenance::Derivation;
-pub use timestamp::{Date, Timestamp};
+pub use timestamp::Timestamp;

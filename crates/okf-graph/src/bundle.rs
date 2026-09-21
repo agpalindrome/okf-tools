@@ -17,7 +17,7 @@ use crate::links::{links_in, Link, LinkKind};
 use crate::log;
 use crate::paths::{classify_path, resolve_path, PathKind};
 use crate::provenance::{self, Derivation};
-use crate::{Checks, Concept, Date, Finding, Level, Policy, Rule, RuleId, Timestamp, UsageWindow};
+use crate::{Checks, Concept, Finding, Level, Policy, Rule, RuleId, Timestamp, UsageWindow};
 
 /// A resolved body-link edge: the linking concept points at another concept in
 /// the same bundle (SPEC §6). A link that resolves to no concept is a dangling
@@ -177,7 +177,7 @@ impl Bundle {
         findings
     }
 
-    /// The concepts §5.5 calls stale on `today` — `today >= stale_after` — as
+    /// The concepts §5.5 calls stale at `now` — `now >= stale_after` — as
     /// `CONCEPT-15` findings in Concept ID order.
     ///
     /// Separate from [`findings`] rather than computed during [`load`], and the
@@ -185,27 +185,26 @@ impl Bundle {
     /// bundle alone, so a fixture that reports nothing today reports nothing
     /// forever; folding a clock into `load` would make the same tree answer
     /// differently tomorrow and quietly put an expiry date on this crate's own
-    /// test suite. Here the day is an argument: the binary passes
-    /// [`Date::today`], a test passes a day it pins, and a producer asking what
-    /// goes stale next quarter passes that.
+    /// test suite. Here the instant is an argument: the binary passes
+    /// [`Timestamp::now`], a test passes one it pins, and a producer asking
+    /// what goes stale next quarter passes that.
     ///
-    /// A `stale_after` that is not a date yields nothing here — it is already a
+    /// A `stale_after` that is not a datetime yields nothing here — it is already a
     /// `CONCEPT-13` defect from [`load`], so the silence is a finding already
     /// made rather than a question dropped.
     ///
     /// [`findings`]: Bundle::findings
     /// [`load`]: Bundle::load
-    /// [`Date::today`]: crate::Date::today
-    pub fn stale_as_of(&self, today: Date) -> Vec<Finding> {
+    pub fn stale_as_of(&self, now: Timestamp) -> Vec<Finding> {
         self.concepts()
             .filter_map(|(id, concept)| {
                 let declared = concept.frontmatter().stale_after()?;
-                let stale_after = Date::parse(&declared)?;
-                (today >= stale_after).then(|| {
+                let stale_after = Timestamp::parse(&declared)?;
+                (now >= stale_after).then(|| {
                     Finding::new(
                         format!("{id}.md"),
                         Rule::StaleConcept,
-                        format!("stale as of {today}: `stale_after` = `{declared}` (SPEC §5.5)"),
+                        format!("stale as of {now}: `stale_after` = `{declared}` (SPEC §5.5)"),
                     )
                 })
             })
@@ -565,7 +564,7 @@ fn check_concept(file: &str, concept: &Concept) -> Vec<Finding> {
 
     // CONCEPT-12: a declared `generated.at` must be an RFC 3339 datetime (§5.2).
     if let Some(at) = fm.generated().and_then(|g| g.at) {
-        findings.extend(timestamp_finding(file, "generated.at", &at));
+        findings.extend(timestamp_finding(file, "generated.at", &at, "§5.2"));
     }
 
     // CONCEPT-4 / CONCEPT-5: a declared `generated` needs a `by` (§5.2), and it
@@ -593,18 +592,19 @@ fn check_concept(file: &str, concept: &Concept) -> Vec<Finding> {
             findings.extend(actor_finding(file, &format!("verified[{i}].by"), by));
         }
         if let Some(at) = event.at.as_deref() {
-            findings.extend(timestamp_finding(file, &format!("verified[{i}].at"), at));
+            findings.extend(timestamp_finding(
+                file,
+                &format!("verified[{i}].at"),
+                at,
+                "§5.2",
+            ));
         }
     }
 
-    // CONCEPT-13: a declared `stale_after` must be a `YYYY-MM-DD` date (§5.5).
+    // CONCEPT-13: a declared `stale_after` must be an RFC 3339 datetime (§5.5).
     if let Some(stale_after) = fm.stale_after() {
-        if Date::parse(&stale_after).is_none() {
-            findings.push(Finding::new(
-                file,
-                Rule::MalformedStaleAfter,
-                format!("`stale_after` = `{stale_after}` is not a `YYYY-MM-DD` date (SPEC §5.5)"),
-            ));
+        if let Some(detail) = timestamp_defect("stale_after", &stale_after, "§5.5") {
+            findings.push(Finding::new(file, Rule::MalformedStaleAfter, detail));
         }
     }
 
@@ -632,7 +632,7 @@ fn check_concept(file: &str, concept: &Concept) -> Vec<Finding> {
 
         // CONCEPT-14: the per-source credibility signals (§5.1).
         if let Some(last_modified) = source.last_modified.as_deref() {
-            findings.extend(date_finding(
+            findings.extend(signal_finding(
                 file,
                 &format!("sources[{i}].last_modified"),
                 last_modified,
@@ -781,38 +781,47 @@ fn window_findings(file: &str, field: &str, window: Option<UsageWindow>) -> Vec<
     [("from", window.from), ("to", window.to)]
         .into_iter()
         .filter_map(|(bound, value)| {
-            date_finding(file, &format!("{field}.{bound}"), value.as_deref()?)
+            signal_finding(file, &format!("{field}.{bound}"), value.as_deref()?)
         })
         .collect()
 }
 
-/// A `CONCEPT-14` finding when `value` is present but not a `YYYY-MM-DD` date.
-fn date_finding(file: &str, field: &str, value: &str) -> Option<Finding> {
-    if Date::parse(value).is_some() {
-        return None;
-    }
-    Some(Finding::new(
-        file,
-        Rule::MalformedSourceSignal,
-        format!("`{field}` = `{value}` is not a `YYYY-MM-DD` date (SPEC §5.1)"),
-    ))
+/// A `CONCEPT-14` finding when a §5.1 signal's timestamp is present but
+/// unreadable.
+fn signal_finding(file: &str, field: &str, value: &str) -> Option<Finding> {
+    let detail = timestamp_defect(field, value, "§5.1")?;
+    Some(Finding::new(file, Rule::MalformedSourceSignal, detail))
 }
 
 /// A `CONCEPT-12` finding when `value` is present but not an RFC 3339 datetime.
+fn timestamp_finding(file: &str, field: &str, value: &str, section: &str) -> Option<Finding> {
+    let detail = timestamp_defect(field, value, section)?;
+    Some(Finding::new(file, Rule::MalformedTimestamp, detail))
+}
+
+/// Why `value` is not an RFC 3339 datetime, or `None` when it is one.
 ///
-/// The finding quotes the value, because the failure it exists for is a
+/// The detail quotes the value, because the failure it exists for is a
 /// timestamp that looks right: `2026-W01-1T00:00:00Z` differs from the calendar
-/// form in one character and denotes a date eight days earlier.
-fn timestamp_finding(file: &str, field: &str, value: &str) -> Option<Finding> {
+/// form in one character and denotes a date eight days earlier. A bare
+/// `YYYY-MM-DD` gets its own wording: it was the required form for `stale_after`
+/// and the §5.1 signals until the 2026-08-20 edit, so it is the likeliest value
+/// here and the one whose fix is not obvious from "not a datetime". No midnight
+/// is assumed for it — which midnight is the ambiguity the edit removed.
+fn timestamp_defect(field: &str, value: &str, section: &str) -> Option<String> {
     if Timestamp::parse(value).is_some() {
         return None;
     }
-    let detail = if value.trim().is_empty() {
-        format!("`{field}` is empty (SPEC §5.2)")
+    Some(if value.trim().is_empty() {
+        format!("`{field}` is empty (SPEC {section})")
+    } else if value.len() == 10 && Timestamp::parse(&format!("{value}T00:00:00Z")).is_some() {
+        format!(
+            "`{field}` = `{value}` is a date with no time or offset, and SPEC §5 requires \
+             a datetime with an explicit offset (SPEC {section})"
+        )
     } else {
-        format!("`{field}` = `{value}` is not an RFC 3339 datetime (SPEC §5.2)")
-    };
-    Some(Finding::new(file, Rule::MalformedTimestamp, detail))
+        format!("`{field}` = `{value}` is not an RFC 3339 datetime (SPEC {section})")
+    })
 }
 
 /// A well-formed actor (§7), read permissively (see [`actor_finding`]): a

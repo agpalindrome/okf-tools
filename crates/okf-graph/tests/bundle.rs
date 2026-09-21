@@ -3,7 +3,7 @@
 
 use std::path::PathBuf;
 
-use okf_graph::{Bundle, Date, Level, Policy, Rule, Severity};
+use okf_graph::{Bundle, Level, Policy, Rule, Severity, Timestamp};
 
 fn fixture(name: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -138,7 +138,7 @@ fn generated_without_by_is_reported() {
     assert_eq!(bundle.findings()[0].file, "thing.md");
 }
 
-/// A `stale_after` that is not a real date is a CONCEPT-13 defect (§5.5), while
+/// A `stale_after` that is not a real datetime is a CONCEPT-13 defect (§5.5), while
 /// the §5.1 credibility signals are CONCEPT-14 reports. The split is the spec's:
 /// §5.5 is a lifecycle field a consumer computes staleness from, and the signals
 /// are supporting evidence it weighs.
@@ -147,7 +147,7 @@ fn a_malformed_date_is_a_defect_in_stale_after_and_a_report_in_a_signal() {
     let bundle = Bundle::load(&fixture("bad-dates")).expect("loads");
 
     let findings = bundle.findings();
-    assert_eq!(findings.len(), 5);
+    assert_eq!(findings.len(), 7);
 
     let stale: Vec<_> = findings.iter().filter(|f| f.file == "stale.md").collect();
     assert_eq!(stale.len(), 1);
@@ -177,7 +177,33 @@ fn a_malformed_date_is_a_defect_in_stale_after_and_a_report_in_a_signal() {
         .any(|d| d.contains("`sources[0].usage_count` is not an integer")));
     assert!(signals
         .iter()
-        .any(|d| d.contains("`sources[0].usage_window.to` = `2026-06-31`")));
+        .any(|d| d.contains("`sources[0].usage_window.to` = `2026-06-31T00:00:00Z`")));
+}
+
+/// A bare `YYYY-MM-DD` was the required form for `stale_after` and the §5.1
+/// signals until the 2026-08-20 edit, which made every §5 timestamp a datetime
+/// with an explicit offset. It is read as malformed, not as midnight UTC —
+/// which midnight is the ambiguity the edit removed — and the detail says what
+/// changed, since "not a datetime" alone would not tell its author why.
+#[test]
+fn a_date_without_a_time_is_malformed_and_says_so() {
+    let bundle = Bundle::load(&fixture("bad-dates")).expect("loads");
+
+    let dated: Vec<_> = bundle
+        .findings()
+        .iter()
+        .filter(|f| f.file == "date-only.md")
+        .collect();
+    assert_eq!(dated.len(), 2);
+    assert_eq!(dated[0].rule, Rule::MalformedStaleAfter);
+    assert_eq!(dated[1].rule, Rule::MalformedSourceSignal);
+    for finding in dated {
+        assert!(
+            finding.detail.contains("is a date with no time or offset"),
+            "{}",
+            finding.detail
+        );
+    }
 }
 
 /// An `at` that is ISO 8601 but not RFC 3339 is reported as CONCEPT-12 (§5.2),
@@ -223,10 +249,10 @@ fn a_source_without_resource_is_reported() {
 
 /// §5.5's staleness comparison, which no other rule makes: a concept whose
 /// `stale_after` has arrived is CONCEPT-15, and one whose has not — or which
-/// declares none — is not. The day is an argument, so the fixture's dates and
-/// the answer are both fixed forever.
+/// declares none — is not. The instant is an argument, so the fixture's
+/// timestamps and the answer are both fixed forever.
 #[test]
-fn a_concept_past_its_stale_after_is_reported_as_of_that_day() {
+fn a_concept_past_its_stale_after_is_reported_as_of_that_instant() {
     let bundle = Bundle::load(&fixture("stale")).expect("loads");
 
     // The load itself is unchanged: three conformant documents, no findings,
@@ -237,37 +263,39 @@ fn a_concept_past_its_stale_after_is_reported_as_of_that_day() {
         bundle.findings()
     );
 
-    let findings = bundle.stale_as_of(Date::parse("2026-08-15").unwrap());
+    let findings = bundle.stale_as_of(Timestamp::parse("2026-08-15T00:00:00Z").unwrap());
     assert_eq!(findings.len(), 1);
     assert_eq!(findings[0].file, "expired.md");
     assert_eq!(findings[0].rule, Rule::StaleConcept);
     assert_eq!(findings[0].severity(), Some(Severity::Report));
     assert!(
         findings[0].detail.contains("2026-01-01"),
-        "the finding names the declared date: {}",
+        "the finding names the declared instant: {}",
         findings[0].detail
     );
     assert!(
-        findings[0].detail.contains("2026-08-15"),
-        "and the day it was read against: {}",
+        findings[0].detail.contains("2026-08-15T00:00:00Z"),
+        "and the instant it was read against: {}",
         findings[0].detail
     );
 }
 
-/// §5.5 is `today >= stale_after`, so the named day is itself stale. The
-/// off-by-one is the whole rule: a concept reported one day late is a checker
-/// that agrees with the spec everywhere except where it matters.
+/// §5.5 is `now >= stale_after`, so the named instant is itself stale. The
+/// off-by-one is the whole rule: a concept reported one second late is a
+/// checker that agrees with the spec everywhere except where it matters. The
+/// comparison is by instant, so the same moment written with an offset agrees.
 #[test]
-fn the_stale_after_day_is_itself_stale_and_the_day_before_is_not() {
+fn the_stale_after_instant_is_itself_stale_and_the_second_before_is_not() {
     let bundle = Bundle::load(&fixture("stale")).expect("loads");
+    let at = |text| bundle.stale_as_of(Timestamp::parse(text).unwrap());
 
-    let on_the_day = bundle.stale_as_of(Date::parse("2026-01-01").unwrap());
-    assert_eq!(on_the_day.len(), 1);
-    assert_eq!(on_the_day[0].file, "expired.md");
+    let on_the_instant = at("2026-01-01T00:00:00Z");
+    assert_eq!(on_the_instant.len(), 1);
+    assert_eq!(on_the_instant[0].file, "expired.md");
+    assert_eq!(at("2026-01-01T01:00:00+01:00").len(), 1);
 
-    assert!(bundle
-        .stale_as_of(Date::parse("2025-12-31").unwrap())
-        .is_empty());
+    assert!(at("2025-12-31T23:59:59Z").is_empty());
+    assert!(at("2026-01-01T00:59:59+01:00").is_empty());
 }
 
 /// A `stale_after` nothing can read is CONCEPT-13 at load and silent here. The
@@ -282,7 +310,7 @@ fn an_unreadable_stale_after_is_a_defect_not_a_staleness_verdict() {
         .iter()
         .any(|f| f.rule == Rule::MalformedStaleAfter));
     assert!(bundle
-        .stale_as_of(Date::parse("2099-01-01").unwrap())
+        .stale_as_of(Timestamp::parse("2099-01-01T00:00:00Z").unwrap())
         .is_empty());
 }
 
