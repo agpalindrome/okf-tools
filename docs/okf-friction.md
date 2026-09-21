@@ -197,8 +197,13 @@ shape, because accepting the old form would reintroduce the per-timezone
 ambiguity the edit was made to remove.
 
 **The question for upstream.** Should a normative change bump the version, or
-at least be listed in §13? **Not raised upstream** (2026-09-21); raising it is
-the owner's call.
+at least be listed in §13? **Raised upstream** 2026-09-21, as a comment on
+[open-knowledge-format#24][okf-24]. Another implementer had already filed the
+issue on 2026-09-13. The comment adds that okf-graph and the reference agent
+now answer the same `okf_version: "0.2"` bundle differently, and it asks for
+the version bump.
+
+[okf-24]: https://github.com/GoogleCloudPlatform/open-knowledge-format/issues/24#issuecomment-5761389699
 
 [pr232]: https://github.com/GoogleCloudPlatform/knowledge-catalog/pull/232
 [s11]: https://github.com/GoogleCloudPlatform/open-knowledge-format/blob/main/SPEC.md#11-conformance
