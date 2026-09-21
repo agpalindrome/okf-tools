@@ -135,6 +135,6 @@ six DESIGN §4 checks are built (coverage and GROUND-3 need an OKF bundle, via
 `--okf`); no execution engine or neural components are built yet — see the
 design note's Non-goals.
 
-[okf-spec]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md
+[okf-spec]: https://github.com/GoogleCloudPlatform/open-knowledge-format/blob/main/SPEC.md
 [pacioli-split]: https://github.com/ojhermann-org/pacioli#why-this-split
 [pacioli-seam]: https://github.com/ojhermann-org/pacioli#the-interface-contract-the-crux

@@ -159,13 +159,13 @@ Unless you state otherwise, a contribution you submit for inclusion in this
 work, as defined in Apache-2.0, is dual licensed as above with no additional
 terms.
 
-[appendix-a]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md#appendix-a-worked-example-an-income-statement
+[appendix-a]: https://github.com/GoogleCloudPlatform/open-knowledge-format/blob/main/SPEC.md#appendix-a-worked-example-an-income-statement
 [design]: https://github.com/ojhermann-org/okf-tools/blob/main/docs/okf-graph-DESIGN.md
 [friction]: https://github.com/ojhermann-org/okf-tools/blob/main/docs/okf-friction.md
-[okf-spec]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md
-[§4]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md#4-concept-documents
-[§5]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md#5-provenance-trust-and-lifecycle
-[§5.5]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md#55-lifecycle-stale_after
-[§7]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md#7-actor-convention
-[§10]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md#10-attested-computations-concept
-[§11]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md#11-conformance
+[okf-spec]: https://github.com/GoogleCloudPlatform/open-knowledge-format/blob/main/SPEC.md
+[§4]: https://github.com/GoogleCloudPlatform/open-knowledge-format/blob/main/SPEC.md#4-concept-documents
+[§5]: https://github.com/GoogleCloudPlatform/open-knowledge-format/blob/main/SPEC.md#5-provenance-trust-and-lifecycle
+[§5.5]: https://github.com/GoogleCloudPlatform/open-knowledge-format/blob/main/SPEC.md#55-lifecycle-stale_after
+[§7]: https://github.com/GoogleCloudPlatform/open-knowledge-format/blob/main/SPEC.md#7-actor-convention
+[§10]: https://github.com/GoogleCloudPlatform/open-knowledge-format/blob/main/SPEC.md#10-attested-computations-concept
+[§11]: https://github.com/GoogleCloudPlatform/open-knowledge-format/blob/main/SPEC.md#11-conformance

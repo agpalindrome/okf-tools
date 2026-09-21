@@ -182,4 +182,4 @@ which is the expected shape of the work, since both the checks and OKF itself
 are still growing. `Severity` is exhaustive on purpose: it is §11's own binary,
 not a list that grows.
 
-[spec]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md
+[spec]: https://github.com/GoogleCloudPlatform/open-knowledge-format/blob/main/SPEC.md

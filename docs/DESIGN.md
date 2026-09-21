@@ -420,6 +420,6 @@ method + estimate bundles feeding downstream Lean.
   proposed for the first cut.
 - **Nothing lands in the pure Lean core.**
 
-[okf-spec]: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md
+[okf-spec]: https://github.com/GoogleCloudPlatform/open-knowledge-format/blob/main/SPEC.md
 [pacioli-seam]: https://github.com/ojhermann-org/pacioli#the-interface-contract-the-crux
 [pacioli-41]: https://github.com/ojhermann-org/pacioli/issues/41
