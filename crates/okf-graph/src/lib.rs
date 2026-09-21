@@ -49,4 +49,3 @@ pub use paths::{classify_path, resolve_path, PathKind};
 pub use policy::{Level, Policy};
 pub use provenance::Derivation;
 pub use timestamp::Timestamp;
-fn  main( ){}
