@@ -30,8 +30,9 @@ From another flake, `packages.<system>.okf-graph` is the validator on its own �
 what a devShell or a CI step wants, where an app cannot go. `packages.default`
 is the whole workspace, `deon-check` included.
 
-`nix flake check` — the single required check on `main` — builds the workspace,
-runs `cargo fmt --check` and `clippy -D warnings`, and tests every crate.
+`nix flake check` builds the workspace, runs `cargo fmt --check` and
+`clippy -D warnings`, and tests every crate. CI runs it, and `main` requires the
+`ci` job that passes only when it succeeds.
 
 ## License
 

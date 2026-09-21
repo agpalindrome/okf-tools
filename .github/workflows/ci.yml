@@ -25,3 +25,17 @@ jobs:
           extra_nix_config: |
             experimental-features = nix-command flakes
       - run: nix flake check -L
+
+  # The one check the ruleset requires (#117). It names no work, so the job
+  # above can be renamed, split or extended without touching branch
+  # protection. `always()` makes it run when `hooks` fails; testing for
+  # `success` rather than against `failure` keeps a skipped or cancelled
+  # `hooks` from passing as green, which is how a required check that is
+  # skipped would otherwise read.
+  ci:
+    name: ci
+    needs: [hooks]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - run: test "${{ needs.hooks.result }}" = success
