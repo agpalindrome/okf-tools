@@ -205,6 +205,43 @@ the version bump.
 
 [okf-24]: https://github.com/GoogleCloudPlatform/open-knowledge-format/issues/24#issuecomment-5761389699
 
+## 2026-10-03 — §6.2 says relative, and every example means root-relative
+
+[§6.2][s62] defines a path-valued field that does not start with `/` as "a
+relative path", interpreted against the concept that carries it. But
+[§6.3][s63] writes `references/attesters/revenue.py`, and the [§10.2][s102] and
+[§10.3][s103] examples sit in `computations/` and write `references/…` with no
+leading `/`, meaning the bundle root. The reference bundle `acme_retail` follows
+the examples. Read the §6.2 way, none of its path-valued fields resolve.
+
+That is measured, not inferred. okf-graph 0.6.0 run against
+`open-knowledge-format/bundles/acme_retail` at `ad30107`:
+
+```
+okf-graph 0.6.0: 0 defect(s), 12 report(s) across 9 concept(s)
+```
+
+All 12 reports are `BUNDLE-3 (dangling path)`, for example
+`computations/revenue-ytd.md`'s `executor.resource` path
+`skills/run-on-bq.md`, which it resolved from `computations/`.
+
+**How okf-graph handles it.** It follows §6.2's text, which is the normative
+statement, over the examples, which are illustrative. A dangling path is a
+report, not a defect, so the reference bundle still passes. Reading paths
+root-relative instead would leave `../` with no meaning, and §6.2 gives
+`../computations/revenue.md` as its own example of a relative path.
+
+**Already raised upstream** by a third party, as
+[open-knowledge-format#29][okf-29] (2026-09-17), which counts the same 12. Open
+PR [#31][okf-31] would fix the examples and the bundle by adding a leading `/`,
+which matches okf-graph. If upstream instead redefines §6.2 as root-relative,
+okf-graph's resolution in `paths.rs` has to change. Neither had landed by
+2026-10-03; not commented on, and doing so is the owner's call.
+
+[okf-29]: https://github.com/GoogleCloudPlatform/open-knowledge-format/issues/29
+[okf-31]: https://github.com/GoogleCloudPlatform/open-knowledge-format/pull/31
+[s63]: https://github.com/GoogleCloudPlatform/open-knowledge-format/blob/main/SPEC.md#63-the-references-convention
+
 [pr232]: https://github.com/GoogleCloudPlatform/knowledge-catalog/pull/232
 [s11]: https://github.com/GoogleCloudPlatform/open-knowledge-format/blob/main/SPEC.md#11-conformance
 [issue]: https://github.com/GoogleCloudPlatform/knowledge-catalog/issues/234
