@@ -211,6 +211,25 @@ the version bump.
 
 [okf-24]: https://github.com/GoogleCloudPlatform/open-knowledge-format/issues/24#issuecomment-5761389699
 
+## 2026-10-15 — §9 fixes no heading level, and no rule for an ungrouped log
+
+[§9][s9] describes a log as "a flat list of date-grouped entries" and says
+"Date headings MUST use ISO 8601 `YYYY-MM-DD` form"; its example uses `##`.
+It never says which heading level a date heading sits at, and never says
+whether a log with entries under no date heading at all conforms.
+
+**How okf-graph handles it** (decided 2026-10-15, #133). A date heading is
+read at any ATX level and in setext form, so the same non-ISO date no longer
+passes at `###` when it fails at `##`. A heading with no digit is a title or
+a section name, not a date heading, and is not judged. A log with no date
+headings draws nothing: §9's "date-grouped" is a description of the shape,
+and whether an ungrouped log violates it is a reading this tool does not
+make.
+
+**The question for upstream.** Should §9 fix the heading level, and say
+whether an entry outside any date group is conformant? **Not raised
+upstream**; raising it is the owner's call.
+
 ## 2026-10-03 — §6.2 says relative, and every example means root-relative
 
 [§6.2][s62] defines a path-valued field that does not start with `/` as "a

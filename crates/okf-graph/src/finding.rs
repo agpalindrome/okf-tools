@@ -78,8 +78,9 @@ pub enum Rule {
     /// INDEX-3: a root `index.md` declares an `okf_version` this tool does not
     /// understand (§12). A report — §12 says best-effort, do not refuse.
     UnknownOkfVersion,
-    /// LOG-1: a `log.md` date heading is not ISO-8601 `YYYY-MM-DD` (§9). A
-    /// defect: §9 makes the date format an explicit MUST.
+    /// LOG-1: a `log.md` date heading, at any level, is not ISO-8601
+    /// `YYYY-MM-DD` (§9). A defect: §9 makes the date format an explicit MUST.
+    /// A heading with no digit is a title or section, not a date heading.
     NonIsoLogDate,
     /// LOG-2: a `log.md`'s date headings are not in newest-first order (§9). A
     /// report — §9 states the order but does not mark it a MUST (#47 friction).

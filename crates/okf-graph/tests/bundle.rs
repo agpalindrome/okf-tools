@@ -872,3 +872,20 @@ fn a_path_above_the_bundle_root_is_dangling_not_an_edge() {
         bundle.derivations()
     );
 }
+
+/// §9 fixes no heading level, so a date heading is read at any level, and a
+/// heading with no digit is a title rather than a date. Reading only `##`
+/// judged `## Changes` and `## Notes` and missed the date at `###` (#133).
+/// Setext headings are covered by the parser's own unit test.
+#[test]
+fn a_log_date_heading_is_checked_at_any_level() {
+    let bundle = Bundle::load(&fixture("log-heading-levels")).expect("loads");
+
+    assert_eq!(bundle.findings().len(), 1, "{:?}", bundle.findings());
+    assert_eq!(bundle.findings()[0].rule, Rule::NonIsoLogDate);
+    assert!(
+        bundle.findings()[0].detail.contains("May 22, 2026"),
+        "{}",
+        bundle.findings()[0].detail
+    );
+}

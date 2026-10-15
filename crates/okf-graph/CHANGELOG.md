@@ -7,6 +7,12 @@ may break the API, and an MSRV change is one of the things that earns it.
 
 ### Changed
 
+- **LOG-1 reads a date heading at any level.** Only `##` was read, so the
+  same non-ISO date passed at `###` or `#` and as a setext heading. §9 says
+  "Date headings MUST use ISO 8601" and fixes no level. A heading with no
+  digit is a title or section name, not a date heading, and is no longer
+  judged: `## Summary` used to be LOG-1 and is not. Decided in #133; the
+  ungrouped-log question is logged in `docs/okf-friction.md`.
 - **A path that climbs above the bundle root is dangling, not clamped.**
   `resolve_path` returns `Option<String>` and is `None` for a target above the
   root; it used to clamp there, so `../../foo.md` from `a/b.md` resolved to
