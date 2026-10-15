@@ -270,8 +270,21 @@ impl Bundle {
         let mut findings = Vec::new();
         for (from, concept) in &self.concepts {
             for link in links_in(concept.body().as_str()) {
-                let Some(to) = resolve_concept_target(from, &link) else {
-                    continue;
+                let to = match resolve_concept_target(from, &link) {
+                    None => continue,
+                    Some(ConceptTarget::Escapes) => {
+                        findings.push(Finding::new(
+                            format!("{from}.md"),
+                            Rule::DanglingLink,
+                            format!(
+                                "link to `{}` climbs above the bundle root, so it resolves to \
+                                 no concept in the bundle",
+                                link.target
+                            ),
+                        ));
+                        continue;
+                    }
+                    Some(ConceptTarget::Id(to)) => to,
                 };
                 if self.concepts.contains_key(&to) {
                     edges.push(BodyLink {
@@ -406,15 +419,20 @@ impl Bundle {
                 LinkKind::BundleAbsolute | LinkKind::Relative => resolve_path(&from, &link.target),
                 LinkKind::External | LinkKind::Fragment => continue,
             };
-            if !self.entry_resolves(&target) {
-                findings.push(Finding::new(
-                    path,
-                    Rule::DanglingIndexEntry,
-                    format!(
-                        "index entry `{}` resolves to no concept, file, or directory",
-                        link.target
-                    ),
-                ));
+            let detail = match target {
+                None => Some(format!(
+                    "index entry `{}` climbs above the bundle root, so it resolves to no \
+                     concept, file, or directory",
+                    link.target
+                )),
+                Some(target) if !self.entry_resolves(&target) => Some(format!(
+                    "index entry `{}` resolves to no concept, file, or directory",
+                    link.target
+                )),
+                Some(_) => None,
+            };
+            if let Some(detail) = detail {
+                findings.push(Finding::new(path, Rule::DanglingIndexEntry, detail));
             }
         }
     }
@@ -445,15 +463,20 @@ impl Bundle {
                 LinkKind::BundleAbsolute | LinkKind::Relative => resolve_path(&from, &link.target),
                 LinkKind::External | LinkKind::Fragment => continue,
             };
-            if !self.entry_resolves(&target) {
-                findings.push(Finding::new(
-                    path,
-                    Rule::DanglingLogEntry,
-                    format!(
-                        "log entry `{}` resolves to no concept, file, or directory",
-                        link.target
-                    ),
-                ));
+            let detail = match target {
+                None => Some(format!(
+                    "log entry `{}` climbs above the bundle root, so it resolves to no \
+                     concept, file, or directory",
+                    link.target
+                )),
+                Some(target) if !self.entry_resolves(&target) => Some(format!(
+                    "log entry `{}` resolves to no concept, file, or directory",
+                    link.target
+                )),
+                Some(_) => None,
+            };
+            if let Some(detail) = detail {
+                findings.push(Finding::new(path, Rule::DanglingLogEntry, detail));
             }
         }
     }
@@ -474,7 +497,8 @@ impl Bundle {
     fn derivation_target(&self, from: &str, resource: &str) -> Option<String> {
         match classify_path(resource, true) {
             PathKind::BundlePath | PathKind::Relative => {
-                let path = resolve_path(from, resource);
+                // An escaping path is no derivation; `check_paths` reports it.
+                let path = resolve_path(from, resource)?;
                 let id = path.strip_suffix(".md")?;
                 self.concepts.contains_key(id).then(|| id.to_string())
             }
@@ -1013,11 +1037,21 @@ fn check_path(
     }
     match classify_path(value, allow_scope) {
         PathKind::BundlePath | PathKind::Relative => {
-            if !files.contains(&resolve_path(from, value)) {
+            let detail = match resolve_path(from, value) {
+                None => Some(format!(
+                    "`{field}` path `{value}` climbs above the bundle root, so it resolves to \
+                     no file in the bundle"
+                )),
+                Some(path) if !files.contains(&path) => Some(format!(
+                    "`{field}` path `{value}` resolves to no file in the bundle"
+                )),
+                Some(_) => None,
+            };
+            if let Some(detail) = detail {
                 findings.push(Finding::new(
                     format!("{from}.md"),
                     Rule::DanglingPath,
-                    format!("`{field}` path `{value}` resolves to no file in the bundle"),
+                    detail,
                 ));
             }
         }
@@ -1025,12 +1059,22 @@ fn check_path(
     }
 }
 
+/// Where a body link that names a concept points.
+#[derive(Debug, PartialEq, Eq)]
+enum ConceptTarget {
+    /// The Concept ID, which may or may not be in the bundle.
+    Id(String),
+    /// The link climbs above the bundle root: a concept link in form, with no
+    /// concept it could name.
+    Escapes,
+}
+
 /// The Concept ID a body link points at, or `None` when the link cannot name a
 /// concept (external, a bare fragment, or a target that is not a `.md` file).
 ///
 /// Shares [`resolve_path`] with the path-valued fields for the `.`/`..`
 /// normalisation, then strips the `.md` a concept link must carry.
-fn resolve_concept_target(from: &str, link: &Link) -> Option<String> {
+fn resolve_concept_target(from: &str, link: &Link) -> Option<ConceptTarget> {
     match link.kind {
         LinkKind::BundleAbsolute | LinkKind::Relative => {}
         LinkKind::External | LinkKind::Fragment => return None,
@@ -1039,7 +1083,10 @@ fn resolve_concept_target(from: &str, link: &Link) -> Option<String> {
     if !path.ends_with(".md") {
         return None;
     }
-    Some(strip_md(&resolve_path(from, &link.target)))
+    Some(match resolve_path(from, &link.target) {
+        Some(path) => ConceptTarget::Id(strip_md(&path)),
+        None => ConceptTarget::Escapes,
+    })
 }
 
 #[cfg(test)]
@@ -1084,14 +1131,19 @@ mod tests {
         // absolute ignores the linker; the leading `/`, the `.md`, and a
         // trailing `#fragment` are all stripped.
         assert_eq!(
-            resolve_concept_target("anywhere", &link("/a/b.md#x", LinkKind::BundleAbsolute))
-                .as_deref(),
-            Some("a/b")
+            resolve_concept_target("anywhere", &link("/a/b.md#x", LinkKind::BundleAbsolute)),
+            Some(ConceptTarget::Id("a/b".into()))
         );
         // relative resolves against the linker's directory, applying `..`.
         assert_eq!(
-            resolve_concept_target("a/b/c", &link("../sibling.md", LinkKind::Relative)).as_deref(),
-            Some("a/sibling")
+            resolve_concept_target("a/b/c", &link("../sibling.md", LinkKind::Relative)),
+            Some(ConceptTarget::Id("a/sibling".into()))
+        );
+        // one `..` too many is a concept link in form with no concept it could
+        // name — distinct from "not a concept link", which the caller skips.
+        assert_eq!(
+            resolve_concept_target("a/b", &link("../../out.md", LinkKind::Relative)),
+            Some(ConceptTarget::Escapes)
         );
     }
 

@@ -833,3 +833,42 @@ fn a_file_that_is_not_utf8_is_reported_not_fatal() {
         findings[0].detail
     );
 }
+
+/// A link or path that climbs above the bundle root is dangling, under the
+/// field's own code, and never an edge. It used to be clamped at the root, so
+/// `../../foo.md` from `a/b.md` resolved to `/foo.md` and became a real edge
+/// to a file the author did not point at (#132). The sibling forms that stay
+/// inside the bundle still resolve, so the one honest edge is still there.
+#[test]
+fn a_path_above_the_bundle_root_is_dangling_not_an_edge() {
+    let bundle = Bundle::load(&fixture("escape")).expect("loads");
+
+    let mut findings: Vec<(&str, &str)> = bundle
+        .findings()
+        .iter()
+        .inspect(|f| assert!(f.detail.contains("climbs above the bundle root"), "{f:?}"))
+        .map(|f| (f.file.as_str(), f.rule.code()))
+        .collect();
+    findings.sort();
+    assert_eq!(
+        findings,
+        [
+            ("a/b.md", "BUNDLE-2"),
+            ("a/b.md", "BUNDLE-3"),
+            ("a/index.md", "INDEX-2"),
+            ("log.md", "LOG-3"),
+        ]
+    );
+
+    let edges: Vec<(&str, &str)> = bundle
+        .links()
+        .iter()
+        .map(|l| (l.from.as_str(), l.to.as_str()))
+        .collect();
+    assert_eq!(edges, [("a/b", "foo")], "only the in-bundle sibling link");
+    assert!(
+        bundle.derivations().is_empty(),
+        "{:?}",
+        bundle.derivations()
+    );
+}
