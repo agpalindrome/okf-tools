@@ -42,6 +42,12 @@ clear; what is unclear is whether other schemes are legal.
 **Raised upstream** 2026-07-26 as
 [GoogleCloudPlatform/knowledge-catalog#234][issue].
 
+**Narrowed** (2026-10-15, #131). The permissive reading covers unknown
+schemes, not the one §7 makes load-bearing. A case variant of `human:` —
+`Human:`, `HUMAN:` — is a CONCEPT-5 defect, because a §5.3 consumer keys off
+the exact prefix and reads the variant as a machine actor. Other schemes stay
+as they were.
+
 ## 2026-07-26 — inline computation: §10.3 says fenced, §10.2 indents
 
 [§10.3][s103] says an Attested Computation may carry its computation inline as
