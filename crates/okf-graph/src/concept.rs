@@ -552,15 +552,13 @@ impl Body {
     ///
     /// [`has_empty_computation_section`]: Body::has_empty_computation_section
     pub fn has_computation_section(&self) -> bool {
-        let mut in_fence = false;
+        let mut fence = crate::links::Fence::default();
         for line in self.0.lines() {
+            if fence.step(line) {
+                continue;
+            }
             let trimmed = line.trim_start();
-            if trimmed.starts_with("```") || trimmed.starts_with("~~~") {
-                in_fence = !in_fence;
-            } else if !in_fence
-                && trimmed.starts_with('#')
-                && trimmed.trim_start_matches('#').trim() == "Computation"
-            {
+            if trimmed.starts_with('#') && trimmed.trim_start_matches('#').trim() == "Computation" {
                 return true;
             }
         }
@@ -579,34 +577,29 @@ impl Body {
     /// `# Computation` heading.
     pub fn has_empty_computation_section(&self) -> bool {
         let mut lines = self.0.lines();
-        let mut in_fence = false;
+        let mut fence = crate::links::Fence::default();
         let found = lines.by_ref().any(|line| {
-            let trimmed = line.trim_start();
-            if trimmed.starts_with("```") || trimmed.starts_with("~~~") {
-                in_fence = !in_fence;
-                false
-            } else {
-                !in_fence
-                    && trimmed.starts_with('#')
-                    && trimmed.trim_start_matches('#').trim() == "Computation"
+            if fence.step(line) {
+                return false;
             }
+            let trimmed = line.trim_start();
+            trimmed.starts_with('#') && trimmed.trim_start_matches('#').trim() == "Computation"
         });
         if !found {
             return false;
         }
-        let mut in_fence = false;
+        let mut fence = crate::links::Fence::default();
         for line in lines {
-            let trimmed = line.trim_start();
-            if trimmed.starts_with("```") || trimmed.starts_with("~~~") {
-                in_fence = !in_fence;
-                continue; // the fence lines themselves are not content
-            }
-            if in_fence {
-                if !trimmed.is_empty() {
-                    return false; // a code block with something in it
+            let was_open = fence.is_open();
+            if fence.step(line) {
+                // The fence lines themselves are not content; a line between
+                // them with anything on it is a code block with something in it.
+                if was_open && fence.is_open() && !line.trim().is_empty() {
+                    return false;
                 }
                 continue;
             }
+            let trimmed = line.trim_start();
             if trimmed.starts_with('#') {
                 return true; // the next heading, with no content between
             }

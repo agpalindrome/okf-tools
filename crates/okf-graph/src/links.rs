@@ -3,11 +3,11 @@
 //! Handles inline `[text](target)` links (including the `(target "title")` and
 //! `(<target>)` forms) and reference-style links — full `[text][ref]`, collapsed
 //! `[text][]`, and shortcut `[ref]` — resolved through their `[ref]: target`
-//! definitions. Fenced code blocks are skipped, and inline code spans are masked
-//! (`` `[x](y)` `` is code, not a link). A code span that runs across lines
-//! (rare; fenced blocks are handled separately) is the one residual, as masking
-//! is per line; and link text with nested brackets (`[a [b]](x)`) matches on the
-//! first `]`.
+//! definitions. Fenced code blocks, indented code blocks and HTML comments are
+//! skipped, and inline code spans are masked (`` `[x](y)` `` is code, not a
+//! link). A code span that runs across lines (rare; fenced blocks are handled
+//! separately) is the one residual, as masking is per line; and link text with
+//! nested brackets (`[a [b]](x)`) matches on the first `]`.
 //!
 //! Resolution to a Concept ID is a separate step (it needs the whole bundle);
 //! this module only reads a body and says what each link *is*.
@@ -44,21 +44,127 @@ pub enum LinkKind {
 /// `[ref]: target` definitions, then scan for links (inline and reference),
 /// skipping fenced code blocks and the definition lines themselves.
 pub fn links_in(body: &str) -> Vec<Link> {
-    let definitions = collect_definitions(body);
+    let body = mask_html_comments(body);
+    let definitions = collect_definitions(&body);
     let mut links = Vec::new();
-    let mut in_fence = false;
+    let mut fence = Fence::default();
+    let mut previous_blank = true;
+    let mut in_indented_code = false;
     for line in body.lines() {
-        let trimmed = line.trim_start();
-        if trimmed.starts_with("```") || trimmed.starts_with("~~~") {
-            in_fence = !in_fence;
+        if fence.step(line) {
+            previous_blank = false;
             continue;
         }
-        if in_fence || is_definition(trimmed) {
+        // An indented code block (four spaces or a tab) opens only after a
+        // blank line, since CommonMark lets it not interrupt a paragraph or a
+        // list item's continuation; it runs until a line that is not indented.
+        let indented = line.starts_with("    ") || line.starts_with('\t');
+        if indented && (previous_blank || in_indented_code) {
+            in_indented_code = true;
+            continue;
+        }
+        let blank = line.trim().is_empty();
+        if !blank && !indented {
+            in_indented_code = false;
+        }
+        previous_blank = blank;
+        if is_definition(line.trim_start()) {
             continue;
         }
         extract_line(line, &definitions, &mut links);
     }
     links
+}
+
+/// Fenced-code state across lines, by CommonMark's rule rather than a toggle:
+/// a run of three or more backticks or tildes opens a fence, and only a run of
+/// the same character at least as long, alone on its line, closes it. A toggle
+/// let a three-backtick line inside a four-backtick fence end it early, and a
+/// `~~~` fence be closed by backticks, leaking links out of code (#135).
+#[derive(Default)]
+pub(crate) struct Fence {
+    open: Option<(char, usize)>,
+}
+
+impl Fence {
+    /// Whether a fence is open, before or after any line.
+    pub(crate) fn is_open(&self) -> bool {
+        self.open.is_some()
+    }
+
+    /// Feed one line; `true` when it is a fence line or inside a fence.
+    pub(crate) fn step(&mut self, line: &str) -> bool {
+        let trimmed = line.trim_start();
+        match self.open {
+            Some((ch, len)) => {
+                let run = trimmed.chars().take_while(|&c| c == ch).count();
+                if run >= len && trimmed[run..].trim().is_empty() {
+                    self.open = None;
+                }
+                true
+            }
+            None => {
+                let ch = match trimmed.chars().next() {
+                    Some(c @ ('`' | '~')) => c,
+                    _ => return false,
+                };
+                let run = trimmed.chars().take_while(|&c| c == ch).count();
+                if run < 3 {
+                    return false;
+                }
+                self.open = Some((ch, run));
+                true
+            }
+        }
+    }
+}
+
+/// Blank out `<!-- … -->` comments, newlines kept so line numbers hold. A link
+/// inside a comment is not rendered and is not a link (#135).
+fn mask_html_comments(body: &str) -> String {
+    let mut out = String::with_capacity(body.len());
+    let mut rest = body;
+    while let Some(start) = rest.find("<!--") {
+        out.push_str(&rest[..start]);
+        let after = &rest[start..];
+        let end = after.find("-->").map(|e| e + 3).unwrap_or(after.len());
+        out.extend(
+            after[..end]
+                .chars()
+                .map(|c| if c == '\n' { '\n' } else { ' ' }),
+        );
+        rest = &after[end..];
+    }
+    out.push_str(rest);
+    out
+}
+
+/// Decode `%XX` escapes in a link target, as a renderer does before resolving
+/// it: `my%20concept.md` names `my concept.md`. A sequence that is not two hex
+/// digits, or that does not decode to UTF-8, leaves the target as written.
+pub fn decode_percent(target: &str) -> std::borrow::Cow<'_, str> {
+    if !target.contains('%') {
+        return std::borrow::Cow::Borrowed(target);
+    }
+    let bytes = target.as_bytes();
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'%' && i + 2 < bytes.len() {
+            let hex = &target[i + 1..i + 3];
+            if let Ok(byte) = u8::from_str_radix(hex, 16) {
+                out.push(byte);
+                i += 3;
+                continue;
+            }
+        }
+        out.push(bytes[i]);
+        i += 1;
+    }
+    match String::from_utf8(out) {
+        Ok(decoded) => std::borrow::Cow::Owned(decoded),
+        Err(_) => std::borrow::Cow::Borrowed(target),
+    }
 }
 
 /// Scan one line, pushing each link's target: inline `[text](target)`, and
@@ -127,16 +233,12 @@ fn resolve_reference(label: &str, definitions: &BTreeMap<String, String>, out: &
 /// footnote definitions (`[^id]: …`, §5.1) are skipped.
 fn collect_definitions(body: &str) -> BTreeMap<String, String> {
     let mut definitions = BTreeMap::new();
-    let mut in_fence = false;
+    let mut fence = Fence::default();
     for line in body.lines() {
+        if fence.step(line) {
+            continue;
+        }
         let trimmed = line.trim_start();
-        if trimmed.starts_with("```") || trimmed.starts_with("~~~") {
-            in_fence = !in_fence;
-            continue;
-        }
-        if in_fence {
-            continue;
-        }
         if let Some((label, target)) = parse_definition(trimmed) {
             definitions.entry(label).or_insert(target);
         }
@@ -147,9 +249,16 @@ fn collect_definitions(body: &str) -> BTreeMap<String, String> {
 /// A `[label]: target` definition — its lowercased label and target (a leading
 /// `<…>` unwrapped, a trailing title dropped). `None` when the line is not a
 /// definition, or is a footnote definition (`[^id]:`).
+///
+/// The label ends at the first `]`, which must be followed by `:` at once. A
+/// search for `]:` anywhere in the line read `[Orders](/x.md) … [note]: see`
+/// as a definition and dropped the link in front of it (#135).
 fn parse_definition(line: &str) -> Option<(String, String)> {
     let rest = line.strip_prefix('[')?;
-    let close = rest.find("]:")?;
+    let close = rest.find(']')?;
+    if !rest[close + 1..].starts_with(':') {
+        return None;
+    }
     let label = &rest[..close];
     if label.is_empty() || label.starts_with('^') {
         return None;
@@ -318,6 +427,58 @@ not a [link](/nope.md)
 ```
 after [also-real](/b.md)";
         assert_eq!(targets(body), ["/a.md", "/b.md"]);
+    }
+
+    /// The four parser gaps the 2026-10-15 audit found (#135), each a
+    /// CommonMark rule rather than a spec reading.
+    #[test]
+    fn a_link_before_a_later_bracket_colon_is_still_a_link() {
+        let body = "[Orders](/orders.md) is explained by [note]: see below\n";
+        assert_eq!(targets(body), ["/orders.md"]);
+    }
+
+    #[test]
+    fn a_fence_closes_only_on_a_matching_run() {
+        let body = "\
+````
+```
+[leaked](/a.md)
+````
+~~~
+```
+[leaked](/b.md)
+~~~
+[real](/c.md)
+";
+        assert_eq!(targets(body), ["/c.md"]);
+    }
+
+    #[test]
+    fn html_comments_and_indented_code_hold_no_links() {
+        let body = "\
+<!-- [hidden](/a.md) -->
+<!--
+[hidden](/b.md)
+-->
+text
+
+    [code](/c.md)
+
+- item
+    [continuation](/d.md)
+[real](/e.md)
+";
+        assert_eq!(targets(body), ["/d.md", "/e.md"]);
+    }
+
+    #[test]
+    fn percent_escapes_decode_for_resolution_only() {
+        assert_eq!(decode_percent("/my%20concept.md"), "/my concept.md");
+        assert_eq!(decode_percent("/plain.md"), "/plain.md");
+        assert_eq!(decode_percent("/odd%2.md"), "/odd%2.md");
+        assert_eq!(decode_percent("/bad%FF.md"), "/bad%FF.md");
+        // the target is kept as written on the link itself
+        assert_eq!(targets("[x](/my%20concept.md)"), ["/my%20concept.md"]);
     }
 
     #[test]

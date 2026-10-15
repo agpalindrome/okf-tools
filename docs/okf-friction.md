@@ -230,6 +230,24 @@ make.
 whether an entry outside any date group is conformant? **Not raised
 upstream**; raising it is the owner's call.
 
+## 2026-10-15 — two surprises a conformant-looking file can get
+
+Two shapes from the audit (#135) where the spec is silent and the answer a
+checker gives is defensible either way, logged so upstream can settle each
+with a sentence.
+
+- **A UTF-8 byte-order mark before the opening fence.** §4 says "a UTF-8
+  markdown file", and Unicode permits the signature. okf-graph reads the file
+  as not opening with `---`, so it is CONCEPT-1, not a concept. A consumer
+  that strips the BOM reads a concept. Neither is wrong under the text.
+- **`type: "Attested Computation "` with a trailing space.** §11 says an
+  unknown `type` MUST NOT be rejected, so okf-graph tolerates it; the §10
+  checks key on the exact string and do not run, while CONCEPT-2 trims and
+  accepts it. A producer gets no hint that its computation was never checked
+  as one. Whether `type` is compared trimmed is the spec's to say.
+
+**Not raised upstream**; raising either is the owner's call.
+
 ## 2026-10-03 — §6.2 says relative, and every example means root-relative
 
 [§6.2][s62] defines a path-valued field that does not start with `/` as "a

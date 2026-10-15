@@ -907,3 +907,28 @@ fn a_link_to_an_existing_reserved_file_is_not_dangling() {
     );
     assert!(bundle.links().is_empty(), "{:?}", bundle.links());
 }
+
+/// Four link-parser gaps from the 2026-10-15 audit (#135), end to end: a
+/// link before a later `]:` is a link, a fence closes only on a matching
+/// run, HTML comments and indented code hold no links, and a percent-encoded
+/// target resolves. One real dangling link remains, and one real edge.
+#[test]
+fn the_link_parser_reads_commonmark_forms() {
+    let bundle = Bundle::load(&fixture("link-forms")).expect("loads");
+
+    let dangling: Vec<&str> = bundle
+        .findings()
+        .iter()
+        .inspect(|f| assert_eq!(f.rule, Rule::DanglingLink, "{f:?}"))
+        .map(|f| f.detail.as_str())
+        .collect();
+    assert_eq!(dangling.len(), 1, "{dangling:?}");
+    assert!(dangling[0].contains("/missing.md"), "{}", dangling[0]);
+
+    let edges: Vec<(&str, &str)> = bundle
+        .links()
+        .iter()
+        .map(|l| (l.from.as_str(), l.to.as_str()))
+        .collect();
+    assert_eq!(edges, [("note", "my concept")]);
+}
