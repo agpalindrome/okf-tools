@@ -1,0 +1,53 @@
+name: Advisories
+
+# Checks the dependency tree against the RustSec advisory database.
+#
+# Separate from `CI`, and on a schedule rather than on a pull request, because
+# this is the one `cargo deny` check whose answer is not a function of the
+# commit. The RustSec database changes daily, so the same commit passes today
+# and fails tomorrow. `nix flake check` fetches only pinned inputs — `flake.lock`,
+# `Cargo.lock` — so a rerun resolves the same graph; putting a moving input in
+# that job would end the property that makes a rerun mean anything, and the
+# sandbox has no network to fetch it with anyway.
+#
+# A schedule is also the better instrument. Advisories are published against
+# code that already merged, so a pull-request gate would only ever catch what
+# was known on the day a branch happened to run. This catches the rest.
+#
+# Not a required status check: the ruleset requires `ci` alone (#117), and a
+# second required name is a decision to take on purpose. A failure here is a
+# signal to act, not a merge block. The pattern is sextant's `advisories.yml`.
+#
+# Dependabot does not cover this. GitHub's advisory database imports RustSec
+# vulnerabilities but not its unmaintained notices (measured 2026-10-15 against
+# RUSTSEC-2024-0449), so this job is the only thing that reports those.
+
+on:
+  schedule:
+    # Daily, at an hour nothing else here runs.
+    - cron: "23 6 * * *"
+  workflow_dispatch:
+  # Also on any change to what is being checked or how.
+  pull_request:
+    paths:
+      - "Cargo.lock"
+      - "deny.toml"
+      - ".github/workflows/advisories.yml"
+
+concurrency:
+  group: advisories-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  advisories:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cachix/install-nix-action@v30
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+      - run: nix develop -c cargo deny check advisories
