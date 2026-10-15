@@ -889,3 +889,21 @@ fn a_log_date_heading_is_checked_at_any_level() {
         bundle.findings()[0].detail
     );
 }
+
+/// A body link to an existing `index.md` or `log.md` is neither dangling nor
+/// an edge: the target exists, so §6.1's dangling does not apply, and it is
+/// not a concept, so §2's Link does not either. The missing target beside
+/// them is still BUNDLE-2 (#134).
+#[test]
+fn a_link_to_an_existing_reserved_file_is_not_dangling() {
+    let bundle = Bundle::load(&fixture("reserved-links")).expect("loads");
+
+    assert_eq!(bundle.findings().len(), 1, "{:?}", bundle.findings());
+    assert_eq!(bundle.findings()[0].rule, Rule::DanglingLink);
+    assert!(
+        bundle.findings()[0].detail.contains("/ghost.md"),
+        "{}",
+        bundle.findings()[0].detail
+    );
+    assert!(bundle.links().is_empty(), "{:?}", bundle.links());
+}

@@ -39,7 +39,8 @@ pub enum Rule {
     DuplicateId,
     /// BUNDLE-2: a body link resolves to no concept in the bundle (§6). A
     /// report, not a defect — the spec says a broken link may just be
-    /// not-yet-written knowledge.
+    /// not-yet-written knowledge. A link to an existing reserved file is not
+    /// one: the target exists, it is just not a concept.
     DanglingLink,
     /// CONCEPT-3: `status` is present but not `draft` / `stable` / `deprecated`
     /// (§5.4).
