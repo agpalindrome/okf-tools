@@ -391,6 +391,7 @@
               pkgs.rustc
               pkgs.clippy
               pkgs.rustfmt
+              pkgs.cargo-deny
             ];
           };
         }
