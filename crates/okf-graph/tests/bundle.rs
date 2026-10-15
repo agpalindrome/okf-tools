@@ -3,7 +3,7 @@
 
 use std::path::PathBuf;
 
-use okf_graph::{Bundle, Level, Policy, Rule, Severity, Timestamp};
+use okf_graph::{Bundle, Finding, Level, Policy, Rule, Severity, Timestamp};
 
 fn fixture(name: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -719,4 +719,80 @@ fn warning_a_defect_down_keeps_it_visible_and_passes() {
     assert!(bundle.fails(&Policy::new()));
     assert!(!bundle.fails(&policy));
     assert_eq!(bundle.findings_at(&policy).len(), 1);
+}
+
+/// A key that is present in the wrong shape is a finding, not an absence. Each
+/// of these used to read as "not declared" because the shape-only readers
+/// return nothing for a wrong shape and nothing for absent alike — the
+/// near-miss form this suite exists to catch, found by the 2026-10-15 audit.
+#[test]
+fn a_key_in_the_wrong_shape_is_reported_not_ignored() {
+    let bundle = Bundle::load(&fixture("wrong-shape")).expect("loads");
+
+    let rules = |file: &str| -> Vec<Rule> {
+        let mut rules: Vec<Rule> = bundle
+            .findings()
+            .iter()
+            .filter(|f| f.file == file)
+            .filter_map(|f| f.rule.spec())
+            .collect();
+        rules.sort_by_key(|r| r.code().to_string());
+        rules
+    };
+    let detail = |file: &str| -> String {
+        bundle
+            .findings()
+            .iter()
+            .filter(|f| f.file == file)
+            .map(|f| f.detail.clone())
+            .collect::<Vec<_>>()
+            .join(" | ")
+    };
+
+    assert_eq!(rules("verified-string.md"), [Rule::MalformedVerification]);
+    assert!(detail("verified-string.md").contains("a string, not a list"));
+    assert_eq!(rules("verified-no-by.md"), [Rule::MalformedVerification]);
+    assert!(detail("verified-no-by.md").contains("declares no `by`"));
+    assert_eq!(rules("stale-map.md"), [Rule::MalformedStaleAfter]);
+    assert_eq!(rules("sources-string.md"), [Rule::MissingSourceResource]);
+    assert_eq!(rules("sources-entries.md"), [Rule::MissingSourceResource]);
+    assert!(detail("sources-entries.md").contains("`sources[0]`"));
+    assert_eq!(rules("params-map.md"), [Rule::MalformedParameter]);
+    assert_eq!(
+        rules("executor-string.md"),
+        [Rule::IncompleteAttestation, Rule::IncompleteAttestation]
+    );
+    // One finding, not "nowhere" or "twice" about a key the author did write.
+    assert_eq!(
+        rules("computation-map.md"),
+        [Rule::InvalidComputationSource]
+    );
+    assert!(detail("computation-map.md").contains("not a path string"));
+    assert_eq!(rules("empty-fence.md"), [Rule::EmptyComputation]);
+    assert_eq!(rules("runtime-list.md"), [Rule::MissingRuntime]);
+    assert!(detail("runtime-list.md").contains("not a string"));
+
+    for rule in [Rule::MalformedVerification, Rule::MalformedStaleAfter] {
+        assert_eq!(rule.severity(), Severity::Defect, "{rule:?}");
+    }
+}
+
+/// An unquoted `okf_version` is a YAML number. It used to be dropped for not
+/// being a string, so `okf_version: 0.3` passed while `"0.3"` was INDEX-3.
+#[test]
+fn an_unquoted_okf_version_is_still_examined() {
+    let bundle = Bundle::load(&fixture("index-version-float")).expect("loads");
+
+    let versions: Vec<&Finding> = bundle
+        .findings()
+        .iter()
+        .filter(|f| f.rule == Rule::UnknownOkfVersion)
+        .collect();
+    assert_eq!(versions.len(), 1, "{:?}", bundle.findings());
+    assert!(versions[0].detail.contains("0.3"), "{}", versions[0].detail);
+    assert!(
+        versions[0].detail.contains("unquoted"),
+        "{}",
+        versions[0].detail
+    );
 }

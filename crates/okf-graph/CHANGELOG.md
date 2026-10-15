@@ -3,6 +3,39 @@
 Notable changes to `okf-graph`, newest first. The crate is pre-1.0: a minor bump
 may break the API, and an MSRV change is one of the things that earns it.
 
+## Unreleased
+
+### Added
+
+- **CONCEPT-16, malformed `verified`.** A `verified` that is not a list of
+  `{ by, at }` events (or the one bare mapping §5.2 allows), or an event with
+  no `by`, is a defect. These shapes used to read as "no events" and were never
+  examined, while the same shapes on `generated` were already CONCEPT-4. §5.3
+  derives the trust tier from `by` alone, so an event without one yields a tier
+  from nothing.
+
+### Fixed
+
+- **A key present in the wrong shape is a finding, not an absence.** The
+  shape-only readers return nothing for a wrong shape and nothing for absent
+  alike, so `stale_after: { at: … }`, `sources: https://…`, a string entry in
+  `sources`, `parameters: { year: integer }`, `executor: skills/run.md`,
+  `computation: { path: … }` and `runtime: [bigquery]` all passed silently.
+  Each now draws its family's existing code (CONCEPT-13, CONCEPT-6, CONCEPT-9,
+  CONCEPT-10, CONCEPT-8, CONCEPT-7) with a detail naming the shape written.
+  A malformed `computation:` is one finding, and the §10.3 one-place rule is
+  not asked on top of it.
+- **An empty fenced block under `# Computation` is CONCEPT-11.** The fence
+  lines themselves counted as content, so a block with nothing in it passed.
+  Prose under the heading still counts as content, as before and on purpose.
+- **An unquoted `okf_version` is still examined.** `okf_version: 0.3` is a
+  YAML number and was dropped for not being a string, so it passed while
+  `"0.3"` was INDEX-3. The report now names it as read, and says it was
+  unquoted, because `0.10` has already become `0.1` by then.
+
+All of these came out of an adversarial audit of the suite on 2026-10-15:
+shapes that parse, pass, and are silently never examined.
+
 ## 0.6.0 — 2026-09-21
 
 ### Changed

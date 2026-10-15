@@ -34,10 +34,17 @@ pub(crate) fn check_frontmatter(frontmatter: &str, is_root: bool) -> Frontmatter
             for (key, value) in &map {
                 let key = key.as_str().unwrap_or("?");
                 if is_root && key == "okf_version" {
-                    if let Some(version) = value.as_str() {
-                        if !understands(version) {
-                            unknown_version = Some(version.to_string());
-                        }
+                    // §12 writes the version quoted; unquoted it is a YAML
+                    // number, and `0.10` has already collapsed to `0.1` by the
+                    // time it is read. Rendering it keeps the report reachable
+                    // rather than dropping the key for not being a string.
+                    let version = match value {
+                        Value::String(s) => s.clone(),
+                        Value::Number(n) => format!("{n} (unquoted, read as a number)"),
+                        other => format!("{} (not a string)", shape_name(other)),
+                    };
+                    if !understands(version.split(' ').next().unwrap_or("")) {
+                        unknown_version = Some(version);
                     }
                 } else {
                     illegal_keys.push(key.to_string());
@@ -50,5 +57,18 @@ pub(crate) fn check_frontmatter(frontmatter: &str, is_root: bool) -> Frontmatter
     FrontmatterCheck {
         illegal_keys,
         unknown_version,
+    }
+}
+
+/// What kind of YAML node a value is, for a finding that names the wrong shape.
+fn shape_name(value: &Value) -> &'static str {
+    match value {
+        Value::Null => "null",
+        Value::Bool(_) => "a boolean",
+        Value::Number(_) => "a number",
+        Value::String(_) => "a string",
+        Value::Sequence(_) => "a list",
+        Value::Mapping(_) => "a mapping",
+        Value::Tagged(_) => "a tagged value",
     }
 }

@@ -265,6 +265,37 @@ impl Frontmatter {
         self.fields.contains_key(key)
     }
 
+    /// How a declared list-of-mappings key fails its shape, in document order:
+    /// empty when the key is absent or well-formed. `bare_mapping_ok` is the
+    /// §5.2 allowance for `verified`, where one mapping is a one-element list.
+    ///
+    /// This is the `Vec` readers' half of [`declares`]: they drop a non-list and
+    /// every non-mapping entry, so a `sources: https://…` or a
+    /// `parameters: [year]` read as empty and were never examined. Each shape
+    /// below names what was written, so the finding can.
+    ///
+    /// [`declares`]: Frontmatter::declares
+    /// Whether `key` is declared and is a mapping — the shape question for the
+    /// `Option<struct>` readers (`executor`, `attester`), which return `None`
+    /// for absent and for a wrong shape alike.
+    pub fn declares_mapping(&self, key: &str) -> bool {
+        self.fields.get(key).is_some_and(Value::is_mapping)
+    }
+
+    pub fn list_shape_errors(&self, key: &str, bare_mapping_ok: bool) -> Vec<String> {
+        match self.fields.get(key) {
+            None => Vec::new(),
+            Some(Value::Sequence(items)) => items
+                .iter()
+                .enumerate()
+                .filter(|(_, item)| !item.is_mapping())
+                .map(|(i, item)| format!("`{key}[{i}]` is {}, not a mapping", shape_name(item)))
+                .collect(),
+            Some(Value::Mapping(_)) if bare_mapping_ok => Vec::new(),
+            Some(other) => vec![format!("`{key}` is {}, not a list", shape_name(other))],
+        }
+    }
+
     /// The scalar at `key`, rendered as the document wrote it. Separates two
     /// failures [`status`] reports alike: `provisional` is an unmodelled stage,
     /// `true` is a value nothing can read, and the two want different fixes.
@@ -516,8 +547,10 @@ impl Body {
     /// Keyed on the heading's presence, at any level and outside fenced code,
     /// **not** on the code block's style: §10.3 says "fenced", but §10.2's own
     /// example indents it (`docs/okf-friction.md`), so requiring a fence would
-    /// miss the spec's example. Whether the section actually holds a block is a
-    /// finer check, deferred (#58).
+    /// miss the spec's example. Whether the section actually holds anything is
+    /// [`has_empty_computation_section`], CONCEPT-11.
+    ///
+    /// [`has_empty_computation_section`]: Body::has_empty_computation_section
     pub fn has_computation_section(&self) -> bool {
         let mut in_fence = false;
         for line in self.0.lines() {
@@ -539,8 +572,11 @@ impl Body {
     ///
     /// "Empty" is measured as *content presence*, not "has a code block", so it
     /// does not depend on the §10.3 fenced-vs-indented ambiguity
-    /// (`docs/okf-friction.md`): any content — a fence, indented code, or prose
-    /// — counts as delivered. `false` when there is no `# Computation` heading.
+    /// (`docs/okf-friction.md`): any content — a fenced block with something in
+    /// it, indented code, or prose — counts as delivered. A fence enclosing only
+    /// blank lines is not content: it is the shape of a block with nothing in
+    /// it, which is what this rule exists to catch. `false` when there is no
+    /// `# Computation` heading.
     pub fn has_empty_computation_section(&self) -> bool {
         let mut lines = self.0.lines();
         let mut in_fence = false;
@@ -558,10 +594,18 @@ impl Body {
         if !found {
             return false;
         }
+        let mut in_fence = false;
         for line in lines {
             let trimmed = line.trim_start();
             if trimmed.starts_with("```") || trimmed.starts_with("~~~") {
-                return false; // a code block is content
+                in_fence = !in_fence;
+                continue; // the fence lines themselves are not content
+            }
+            if in_fence {
+                if !trimmed.is_empty() {
+                    return false; // a code block with something in it
+                }
+                continue;
             }
             if trimmed.starts_with('#') {
                 return true; // the next heading, with no content between
@@ -647,5 +691,18 @@ pub(crate) fn split_frontmatter(source: &str) -> (Option<&str>, &str) {
     match split(source) {
         Ok((frontmatter, body)) => (Some(frontmatter), body),
         Err(_) => (None, source),
+    }
+}
+
+/// What kind of YAML node a value is, for a finding that names the wrong shape.
+fn shape_name(value: &Value) -> &'static str {
+    match value {
+        Value::Null => "null",
+        Value::Bool(_) => "a boolean",
+        Value::Number(_) => "a number",
+        Value::String(_) => "a string",
+        Value::Sequence(_) => "a list",
+        Value::Mapping(_) => "a mapping",
+        Value::Tagged(_) => "a tagged value",
     }
 }

@@ -585,11 +585,33 @@ fn check_concept(file: &str, concept: &Concept) -> Vec<Finding> {
         }
     }
 
-    // CONCEPT-5 / CONCEPT-12: every `verified[]` event must carry a well-formed
-    // actor (§7) and an RFC 3339 `at` (§5.2).
+    // CONCEPT-16: a declared `verified` is a list of `{ by, at }` events, or the
+    // one bare mapping §5.2 allows; anything else was read as "no events" and
+    // never examined, while the same shapes on `generated` were CONCEPT-4.
+    for detail in fm.list_shape_errors("verified", true) {
+        findings.push(Finding::new(
+            file,
+            Rule::MalformedVerification,
+            format!("{detail} (SPEC §5.2)"),
+        ));
+    }
+
+    // CONCEPT-16 / CONCEPT-5 / CONCEPT-12: every `verified[]` event needs a `by`
+    // (§5.3 derives the trust tier from it), a well-formed actor (§7), and an
+    // RFC 3339 `at` (§5.2).
     for (i, event) in fm.verified().iter().enumerate() {
-        if let Some(by) = event.by.as_deref() {
-            findings.extend(actor_finding(file, &format!("verified[{i}].by"), by));
+        match event.by.as_deref() {
+            None => findings.push(Finding::new(
+                file,
+                Rule::MalformedVerification,
+                format!("`verified[{i}]` declares no `by` (SPEC §5.2)"),
+            )),
+            Some(by) if by.trim().is_empty() => findings.push(Finding::new(
+                file,
+                Rule::MalformedVerification,
+                format!("`verified[{i}].by` is empty (SPEC §5.2)"),
+            )),
+            Some(by) => findings.extend(actor_finding(file, &format!("verified[{i}].by"), by)),
         }
         if let Some(at) = event.at.as_deref() {
             findings.extend(timestamp_finding(
@@ -602,15 +624,35 @@ fn check_concept(file: &str, concept: &Concept) -> Vec<Finding> {
     }
 
     // CONCEPT-13: a declared `stale_after` must be an RFC 3339 datetime (§5.5).
-    if let Some(stale_after) = fm.stale_after() {
-        if let Some(detail) = timestamp_defect("stale_after", &stale_after, "§5.5") {
-            findings.push(Finding::new(file, Rule::MalformedStaleAfter, detail));
+    // The reader returns `None` for a mapping or list as well as for absent, so
+    // the shape question is asked through `declares`, as CONCEPT-3 does.
+    match fm.stale_after() {
+        Some(stale_after) => {
+            if let Some(detail) = timestamp_defect("stale_after", &stale_after, "§5.5") {
+                findings.push(Finding::new(file, Rule::MalformedStaleAfter, detail));
+            }
         }
+        None if fm.declares("stale_after") => findings.push(Finding::new(
+            file,
+            Rule::MalformedStaleAfter,
+            "`stale_after` is a mapping or list, not a single instant (SPEC §5.5)",
+        )),
+        None => {}
     }
 
     // CONCEPT-14: the shared `usage_window` frames every `usage_count` (§5.1),
     // so a bound nothing can read costs every source's signal, not one.
     findings.extend(window_findings(file, "usage_window", fm.usage_window()));
+
+    // CONCEPT-6: a declared `sources` is a list of entries; a string or a bare
+    // mapping read as "no sources", which dropped the derivation edge silently.
+    for detail in fm.list_shape_errors("sources", false) {
+        findings.push(Finding::new(
+            file,
+            Rule::MissingSourceResource,
+            format!("{detail} (SPEC §5.1)"),
+        ));
+    }
 
     // CONCEPT-6 / CONCEPT-5: each source needs a `resource` (§5.1 REQUIRED), and
     // an `author`, if present, must be a well-formed actor (§7).
@@ -655,21 +697,33 @@ fn check_concept(file: &str, concept: &Concept) -> Vec<Finding> {
     // §10 Attested Computation — type-conditional: these apply only to a concept
     // whose `type` is exactly `Attested Computation`.
     if fm.concept_type() == Some("Attested Computation") {
-        // CONCEPT-7: `runtime` is required for the type (§10.2).
+        // CONCEPT-7: `runtime` is required for the type (§10.2), and a list or
+        // mapping there is not an absent one — the message says which.
         if fm.runtime().is_none_or(|r| r.trim().is_empty()) {
-            findings.push(Finding::new(
-                file,
-                Rule::MissingRuntime,
-                "an Attested Computation declares no `runtime` (SPEC §10.2)",
-            ));
+            let detail = if fm.declares("runtime") && fm.runtime().is_none() {
+                "an Attested Computation's `runtime` is not a string (SPEC §10.2)"
+            } else {
+                "an Attested Computation declares no `runtime` (SPEC §10.2)"
+            };
+            findings.push(Finding::new(file, Rule::MissingRuntime, detail));
         }
 
         // CONCEPT-8: the computation must come from exactly one place (§10.3) —
         // a `computation:` path or a `# Computation` body block, not both, not
-        // neither.
+        // neither. A `computation:` that is not a string is its own finding,
+        // and the xor is not asked on top of it: the reader returned `None`, so
+        // it would say "nowhere" or pass clean about a key the author wrote.
+        let path_malformed = fm.declares("computation") && fm.computation().is_none();
+        if path_malformed {
+            findings.push(Finding::new(
+                file,
+                Rule::InvalidComputationSource,
+                "an Attested Computation's `computation` is not a path string (SPEC §10.3)",
+            ));
+        }
         let has_path = fm.computation().is_some_and(|c| !c.trim().is_empty());
         let has_body = concept.body().has_computation_section();
-        if has_path == has_body {
+        if !path_malformed && has_path == has_body {
             let detail = if has_path {
                 "an Attested Computation gives its computation twice — a `computation:` \
                  path and a `# Computation` body block (SPEC §10.3)"
@@ -692,8 +746,16 @@ fn check_concept(file: &str, concept: &Concept) -> Vec<Finding> {
             ));
         }
 
-        // CONCEPT-9: each declared parameter needs name, type, and a boolean
-        // `required` (§10.2). A report — parameters are a supporting field.
+        // CONCEPT-9: `parameters` is a list of mappings, and each needs name,
+        // type, and a boolean `required` (§10.2). A report — parameters are a
+        // supporting field. A mapping or scalar there read as "no parameters".
+        for detail in fm.list_shape_errors("parameters", false) {
+            findings.push(Finding::new(
+                file,
+                Rule::MalformedParameter,
+                format!("{detail} (SPEC §10.2)"),
+            ));
+        }
         for (i, param) in fm.parameters().iter().enumerate() {
             let mut missing = Vec::new();
             if param.name.is_none() {
@@ -717,8 +779,19 @@ fn check_concept(file: &str, concept: &Concept) -> Vec<Finding> {
             }
         }
 
-        // CONCEPT-10: a declared executor / attester needs a `resource`, and an
-        // executor's `receipt` must be a list (§10.2). Reports.
+        // CONCEPT-10: a declared executor / attester is a mapping with a
+        // `resource`, and an executor's `receipt` must be a list (§10.2).
+        // Reports. A string or list there read as absent, which also skipped
+        // BUNDLE-3: the path it named was never resolved.
+        for key in ["executor", "attester"] {
+            if fm.declares(key) && !fm.declares_mapping(key) {
+                findings.push(Finding::new(
+                    file,
+                    Rule::IncompleteAttestation,
+                    format!("`{key}` is not a `{{ resource, … }}` mapping (SPEC §10.2)"),
+                ));
+            }
+        }
         if let Some(executor) = fm.executor() {
             if executor
                 .resource
