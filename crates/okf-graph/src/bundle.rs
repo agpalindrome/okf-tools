@@ -868,15 +868,33 @@ fn check_concept(file: &str, concept: &Concept) -> Vec<Finding> {
 /// An actor is read permissively — `producer/version` or `scheme:id` — because
 /// §7's three-form list excludes its own §5.1 `team:` example. See
 /// `docs/okf-friction.md`.
+///
+/// One scheme is not read permissively: `human:`. §7 makes it the prefix a
+/// §5.3 consumer keys off, and a case variant (`Human:`, `HUMAN:`) is not an
+/// unlisted scheme but the listed one misspelled in the way that flips a trust
+/// tier to machine-confirmed. Decided 2026-10-15 (#131).
 fn actor_finding(file: &str, field: &str, value: &str) -> Option<Finding> {
-    if is_actor(value) {
-        return None;
+    if !is_actor(value) {
+        return Some(Finding::new(
+            file,
+            Rule::MalformedActor,
+            format!(
+                "`{field}` = `{value}` is not a `producer/version` or `scheme:id` actor (SPEC §7)"
+            ),
+        ));
     }
-    Some(Finding::new(
-        file,
-        Rule::MalformedActor,
-        format!("`{field}` = `{value}` is not a `producer/version` or `scheme:id` actor (SPEC §7)"),
-    ))
+    let scheme = value.split_once(':').map(|(scheme, _)| scheme)?;
+    if scheme != "human" && scheme.eq_ignore_ascii_case("human") {
+        return Some(Finding::new(
+            file,
+            Rule::MalformedActor,
+            format!(
+                "`{field}` = `{value}` writes the `human:` prefix as `{scheme}:`, and §5.3 \
+                 consumers key off the exact `human:` prefix (SPEC §7)"
+            ),
+        ));
+    }
+    None
 }
 
 /// The `CONCEPT-14` findings for a `{ from, to }` window, in field order.

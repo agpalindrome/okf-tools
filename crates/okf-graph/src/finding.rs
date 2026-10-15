@@ -47,7 +47,8 @@ pub enum Rule {
     /// CONCEPT-4: a declared `generated` block carries no `by` (§5.2 REQUIRED).
     MissingGeneratedBy,
     /// CONCEPT-5: an actor field (`generated.by`, `verified[].by`, or a source
-    /// `author`) does not match the §7 convention.
+    /// `author`) does not match the §7 convention, or writes the load-bearing
+    /// `human:` prefix in another case.
     MalformedActor,
     /// CONCEPT-6: a `sources` entry declares no `resource` (§5.1 REQUIRED), or
     /// `sources` is present but not a list of entries, so no entry can.

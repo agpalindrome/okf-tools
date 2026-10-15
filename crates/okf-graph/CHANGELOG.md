@@ -3,6 +3,16 @@
 Notable changes to `okf-graph`, newest first. The crate is pre-1.0: a minor bump
 may break the API, and an MSRV change is one of the things that earns it.
 
+## Unreleased
+
+### Changed
+
+- **A `human:` prefix in another case is CONCEPT-5.** `Human:ahormati` and
+  `HUMAN:ahormati` passed as `scheme:id` actors. §7 says a §5.3 consumer keys
+  off the exact `human:` prefix, so the variant reads as a machine actor and
+  flips the trust tier to machine-confirmed. The permissive actor reading is
+  unchanged for every other scheme. Decided in #131.
+
 ## 0.7.0 — 2026-10-15
 
 ### Added

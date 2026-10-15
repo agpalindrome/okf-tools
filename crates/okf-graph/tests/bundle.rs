@@ -227,14 +227,26 @@ fn a_non_rfc_3339_timestamp_is_reported() {
 }
 
 /// A `by` that is a bare token, not `producer/version` or `scheme:id`, is
-/// reported as CONCEPT-5 (§7).
+/// reported as CONCEPT-5 (§7). So is a `human:` prefix in another case: a
+/// §5.3 consumer keys off the exact prefix, so `Human:` reads as a machine
+/// actor and flips the trust tier (#131).
 #[test]
 fn a_malformed_actor_is_reported() {
     let bundle = Bundle::load(&fixture("bad-actor")).expect("loads");
 
-    assert_eq!(bundle.findings().len(), 1);
-    assert_eq!(bundle.findings()[0].rule, Rule::MalformedActor);
-    assert_eq!(bundle.findings()[0].file, "thing.md");
+    let mut by_file: Vec<(&str, &str)> = bundle
+        .findings()
+        .iter()
+        .inspect(|f| assert_eq!(f.rule, Rule::MalformedActor, "{f:?}"))
+        .map(|f| (f.file.as_str(), f.detail.as_str()))
+        .collect();
+    by_file.sort();
+    assert_eq!(by_file.len(), 3, "{by_file:?}");
+    assert_eq!(by_file[0].0, "case.md");
+    assert!(by_file[0].1.contains("`Human:`"), "{}", by_file[0].1);
+    assert_eq!(by_file[1].0, "case.md");
+    assert!(by_file[1].1.contains("`HUMAN:`"), "{}", by_file[1].1);
+    assert_eq!(by_file[2].0, "thing.md");
 }
 
 /// A `sources` entry with no `resource` is reported as CONCEPT-6 (§5.1).
