@@ -436,3 +436,68 @@ fn allow_empty_accepts_a_bundle_with_no_concepts() {
         String::from_utf8_lossy(&output.stderr)
     );
 }
+
+/// `--quiet` drops the summary, not the silenced count. With both flags the
+/// count had nowhere to go, so `--allow CONCEPT-2 --quiet` on a typeless
+/// concept printed nothing and exited 0: a run that examined less than it
+/// looked like, saying nothing about it.
+#[test]
+fn allow_with_quiet_still_prints_the_silenced_count() {
+    let output = okf_graph()
+        .args(["--allow", "CONCEPT-2", "--quiet"])
+        .arg(fixture("missing-type"))
+        .output()
+        .expect("runs");
+
+    assert_eq!(output.status.code(), Some(0));
+    assert!(output.stdout.is_empty());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("1 silenced"), "stderr: {stderr}");
+    assert!(
+        !stderr.contains("defect(s)"),
+        "the summary itself stays off: {stderr}"
+    );
+}
+
+/// A bundle whose every file fails CONCEPT-1 also holds no concepts. The
+/// empty-bundle guard used to answer first, so the defects never printed and
+/// the run said "no concepts found", which reads as a mistyped path.
+#[test]
+fn a_bundle_whose_every_file_fails_concept_1_prints_the_defect() {
+    let output = okf_graph()
+        .arg(fixture("unreadable"))
+        .output()
+        .expect("runs");
+
+    assert_eq!(output.status.code(), Some(1));
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("CONCEPT-1"), "stdout: {stdout}");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(!stderr.contains("no concepts found"), "stderr: {stderr}");
+}
+
+/// A file that is not UTF-8 is that file's defect (§4), located and printed
+/// beside everything else. It used to abort the whole run with an IO error
+/// naming the bundle root, so one stray byte hid every other finding.
+#[test]
+fn a_file_that_is_not_utf8_is_a_located_defect_not_an_abort() {
+    let dir = std::env::temp_dir().join("okf-graph-cli-not-utf8");
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).expect("mkdir");
+    std::fs::write(dir.join("good.md"), "---\ntype: Thing\n---\n\nbody\n").expect("write");
+    std::fs::write(dir.join("bad.md"), b"---\ntype: Thing\n---\n\n\xff\xfe\n").expect("write");
+
+    let output = okf_graph().arg(&dir).output().expect("runs");
+
+    assert_eq!(output.status.code(), Some(1));
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("bad.md") && stdout.contains("CONCEPT-1") && stdout.contains("UTF-8"),
+        "stdout: {stdout}"
+    );
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("1 concept(s)"),
+        "good.md still loads: {stderr}"
+    );
+}

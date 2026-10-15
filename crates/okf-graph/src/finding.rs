@@ -30,7 +30,8 @@ pub enum Severity {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum Rule {
-    /// CONCEPT-1: a non-reserved `.md` that does not parse as a concept (§11).
+    /// CONCEPT-1: a non-reserved `.md` that does not parse as a concept (§11),
+    /// including one that is not UTF-8 (§4).
     NotAConcept,
     /// CONCEPT-2: a concept with no non-empty `type` (§11).
     MissingType,

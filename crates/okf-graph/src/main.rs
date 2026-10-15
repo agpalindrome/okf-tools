@@ -47,7 +47,8 @@ Options:
     --allow-empty  accept a bundle holding no concepts
     --as-of <TIME> the RFC 3339 instant to read `stale_after` against,
                    e.g. `2026-08-15T00:00:00Z` (default: now)
-    --quiet        print findings only (suppress the summary line)
+    --quiet        print findings only (suppress the summary line; a
+                   non-zero `--allow` count is still printed)
     -h, --help     show this help
     -V, --version  show the version
 
@@ -198,19 +199,6 @@ fn main() -> ExitCode {
         }
     };
 
-    // A bundle with no concepts examined nothing, and a green run there is
-    // indistinguishable from a green run over a valid bundle — which is how a
-    // mistyped path or a bundle that never generated passes CI. Not a rule: §11
-    // has no opinion that a bundle must hold concepts, so a `Severity` would
-    // misstate the spec. It is the same class as naming a path that is not a
-    // directory, and it exits the same way.
-    if bundle.is_empty() && !allow_empty {
-        eprintln!(
-            "error: {bundle_path}: no concepts found (pass --allow-empty if that is expected)"
-        );
-        return ExitCode::from(2);
-    }
-
     // Staleness is asked separately because it is the one question the bundle
     // alone does not answer (§5.5), and the answer joins the rest here rather
     // than in a second summary a reader would have to add up themselves.
@@ -235,7 +223,33 @@ fn main() -> ExitCode {
     // reads as a rule that found nothing.
     let silenced = found.len() - findings.len();
 
-    if !quiet {
+    // A bundle with no concepts examined nothing, and a green run there is
+    // indistinguishable from a green run over a valid bundle — which is how a
+    // mistyped path or a bundle that never generated passes CI. Not a rule: §11
+    // has no opinion that a bundle must hold concepts, so a `Severity` would
+    // misstate the spec. It is the same class as naming a path that is not a
+    // directory, and it exits the same way.
+    //
+    // Asked after the findings print, and only when none is a defect. A bundle
+    // whose every file fails CONCEPT-1 also holds no concepts, and this guard
+    // used to answer first: the defects were never printed and the run said
+    // "no concepts found", which reads as a mistyped path. A run that is
+    // already failing has nothing to be rescued from.
+    if bundle.is_empty() && !allow_empty && defects == 0 {
+        eprintln!(
+            "error: {bundle_path}: no concepts found (pass --allow-empty if that is expected)"
+        );
+        return ExitCode::from(2);
+    }
+
+    if quiet {
+        // `--quiet` drops the summary, not the silenced count: the summary is
+        // the only place that count was printed, so `--allow X --quiet` gave a
+        // run that examined less than it looked like and said nothing.
+        if silenced > 0 {
+            eprintln!("okf-graph {VERSION}: {silenced} silenced in {bundle_path}");
+        }
+    } else {
         let silenced = if silenced > 0 {
             format!(", {silenced} silenced")
         } else {
