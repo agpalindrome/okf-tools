@@ -323,6 +323,46 @@
             ${pkgs.bash}/bin/bash ${./scripts/check-hook-fallback.sh}
             touch $out
           '';
+      # Three of cargo-deny's four checks, hermetic. `advisories` is the
+      # fourth and runs on a schedule instead (.github/workflows/advisories.yml):
+      # it reads a database that changes daily, and the sandbox has no network
+      # to read it with. `bans`, `licenses` and `sources` are a function of
+      # Cargo.lock alone, so they belong in the one required check.
+      #
+      # `--offline` fails in sextant's networked CI because `cargo metadata`
+      # resolves the graph for every platform and wants crates a Linux build
+      # never cached. Here it works: importCargoLock vendors every crate in
+      # Cargo.lock, platform-specific ones included, and cargoSetupHook points
+      # crates.io at that vendor directory, which is what buildRustPackage
+      # above does too.
+      denyFor =
+        system:
+        let
+          pkgs = nixpkgs.legacyPackages.${system};
+        in
+        pkgs.stdenvNoCC.mkDerivation {
+          pname = "deny-check";
+          inherit version;
+          src = pkgs.lib.fileset.toSource {
+            root = ./.;
+            fileset = pkgs.lib.fileset.unions [
+              ./Cargo.toml
+              ./Cargo.lock
+              ./deny.toml
+              ./crates
+            ];
+          };
+          cargoDeps = pkgs.rustPlatform.importCargoLock { lockFile = ./Cargo.lock; };
+          nativeBuildInputs = [
+            pkgs.cargo
+            pkgs.cargo-deny
+            pkgs.rustPlatform.cargoSetupHook
+          ];
+          buildPhase = ''
+            cargo deny --offline check bans licenses sources
+          '';
+          installPhase = "touch $out";
+        };
     in
     {
       packages = forAllSystems (system: {
@@ -345,6 +385,7 @@
         deon-check = deonCheckFor system;
         hook-fallback = hookFallbackFor system;
         prose = proseFor system;
+        deny = denyFor system;
       });
 
       devShells = forAllSystems (

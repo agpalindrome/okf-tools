@@ -120,10 +120,12 @@ stays useful.
   *near-miss* forms specifically — this codebase's characteristic bug is a
   shape that parses, passes, and is silently never examined.
 - **CI:** `nix flake check` gates `cargo fmt --check`, `clippy -D warnings`,
-  and the suite. The ruleset (`.github/rulesets/main.json`, reconciled by
-  `scripts/settings.sh`) requires the `ci` job, which only confirms that job
-  succeeded, so the work job can be renamed without touching branch protection
-  (#117).
+  the suite, and three of cargo-deny's four checks (bans, licenses, sources,
+  from `deny.toml`). Advisories run daily in a separate workflow instead,
+  since that answer changes with the date rather than the commit. The
+  ruleset (`.github/rulesets/main.json`, reconciled by `scripts/settings.sh`)
+  requires the `ci` job, which only confirms that job succeeded, so the work
+  job can be renamed without touching branch protection (#117).
 - **Repo settings as code:** `scripts/settings.sh --check` diffs both the
   ruleset and the About block (`.github/settings/about.json` — description,
   homepage, topics) against live GitHub; `--apply` writes them. It stays

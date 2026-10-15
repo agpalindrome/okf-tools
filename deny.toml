@@ -1,6 +1,7 @@
 # cargo-deny configuration, from the shared defaults in ~/.claude/rust.md.
-# Advisories run on a schedule (.github/workflows/advisories.yml); the other
-# three checks are run by hand from the dev shell: `cargo deny check all`.
+# Advisories run on a schedule (.github/workflows/advisories.yml); bans,
+# licenses and sources run inside `nix flake check` (`checks.deny` in
+# flake.nix). `cargo deny check all` from the dev shell runs all four.
 
 [advisories]
 # Transitive unmaintained crates are as unactionable as duplicate versions.
