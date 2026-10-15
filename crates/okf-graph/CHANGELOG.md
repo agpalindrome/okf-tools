@@ -7,6 +7,15 @@ may break the API, and an MSRV change is one of the things that earns it.
 
 ### Changed
 
+- **A path that climbs above the bundle root is dangling, not clamped.**
+  `resolve_path` returns `Option<String>` and is `None` for a target above the
+  root; it used to clamp there, so `../../foo.md` from `a/b.md` resolved to
+  `/foo.md` and, when a root file of that name existed, became a real edge to
+  a file the author did not point at. Each caller now reports it under its own
+  code (BUNDLE-2, BUNDLE-3, INDEX-2, LOG-3) with a detail saying it climbs
+  above the root, and no edge is made. §6.1 defines dangling by existence in
+  the bundle, and a target above the root is not in it. Decided in #132. The
+  signature change is the API break that makes this a minor bump.
 - **A `human:` prefix in another case is CONCEPT-5.** `Human:ahormati` and
   `HUMAN:ahormati` passed as `scheme:id` actors. §7 says a §5.3 consumer keys
   off the exact `human:` prefix, so the variant reads as a machine actor and

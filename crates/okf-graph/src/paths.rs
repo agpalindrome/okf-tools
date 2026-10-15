@@ -44,13 +44,19 @@ pub fn classify_path(value: &str, allow_scope: bool) -> PathKind {
 /// Resolve a bundle-path or relative `target` to a bundle-relative file path,
 /// applying `.` / `..` against `from` (the Concept ID of the concept that
 /// carries the field). A `/`-rooted target resolves from the root and ignores
-/// `from`; a `#fragment` is dropped; `..` past the root is clamped.
+/// `from`; a `#fragment` is dropped.
+///
+/// `None` when `..` climbs past the bundle root. It used to be clamped there,
+/// so `../../foo.md` from `a/b.md` resolved to `/foo.md` and, if a root file
+/// of that name existed, became a real edge to a file the author did not
+/// point at. §6.1 defines dangling by existence *in the bundle*, and a target
+/// above the root is not in it; the caller reports it as such (#132).
 ///
 /// Only meaningful for [`PathKind::BundlePath`] / [`PathKind::Relative`]; the
 /// caller does not resolve a URL or a scope descriptor. Unlike a concept link,
 /// the `.md` suffix is kept, since a path-valued field names a file (which may
 /// be a `.py` or `.sql`, not a concept).
-pub fn resolve_path(from: &str, target: &str) -> String {
+pub fn resolve_path(from: &str, target: &str) -> Option<String> {
     let mut segments: Vec<&str> = if target.starts_with('/') {
         Vec::new()
     } else {
@@ -64,12 +70,12 @@ pub fn resolve_path(from: &str, target: &str) -> String {
         match part {
             "" | "." => {}
             ".." => {
-                segments.pop();
+                segments.pop()?;
             }
             name => segments.push(name),
         }
     }
-    segments.join("/")
+    Some(segments.join("/"))
 }
 
 /// A URL: protocol-relative (`//host`) or carrying a scheme (`https:`).
@@ -129,20 +135,32 @@ mod tests {
     fn resolves_bundle_and_relative_targets_keeping_the_extension() {
         // bundle-absolute ignores the linking concept; the `.md` stays.
         assert_eq!(
-            resolve_path("anywhere", "/references/ga4.md"),
-            "references/ga4.md"
+            resolve_path("anywhere", "/references/ga4.md").as_deref(),
+            Some("references/ga4.md")
         );
         // relative resolves against the concept's directory, applying `..`.
         assert_eq!(
-            resolve_path("computations/revenue", "../references/run.py"),
-            "references/run.py"
+            resolve_path("computations/revenue", "../references/run.py").as_deref(),
+            Some("references/run.py")
         );
         // a non-md extension is kept — a path-valued field names a file.
         assert_eq!(
-            resolve_path("metrics/revenue", "revenue.sql"),
-            "metrics/revenue.sql"
+            resolve_path("metrics/revenue", "revenue.sql").as_deref(),
+            Some("metrics/revenue.sql")
         );
         // a trailing #fragment is dropped.
-        assert_eq!(resolve_path("a/b", "/c/d.md#x"), "c/d.md");
+        assert_eq!(resolve_path("a/b", "/c/d.md#x").as_deref(), Some("c/d.md"));
+    }
+
+    /// `..` past the root is not clamped: the target is outside the bundle.
+    #[test]
+    fn a_target_above_the_root_does_not_resolve() {
+        assert_eq!(resolve_path("a/b", "../x.md").as_deref(), Some("x.md"));
+        assert_eq!(resolve_path("a/b", "../../x.md"), None);
+        assert_eq!(resolve_path("top", "../x.md"), None);
+        assert_eq!(resolve_path("a/b", "/../x.md"), None);
+        // climbing out and back in is still out: the first `..` past the root
+        // is where the bundle ends.
+        assert_eq!(resolve_path("a/b", "../../a/b.md"), None);
     }
 }
