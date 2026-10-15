@@ -98,9 +98,10 @@ bundle over a dangling link, and a _report_ is that reading — it exists so a
 conformant bundle cannot be failed. A producer checking a bundle it owns in its
 own CI is not that consumer, so `--deny`, `--warn`, and `--allow` move one rule
 at a time by code, last-wins. What `--allow` hides is counted in the summary
-rather than vanishing. In the library the same thing is a `Policy`, read by
-`Bundle::findings_at` and `Bundle::fails`; `Severity` is untouched either way,
-because what the spec says is not a consumer's to configure.
+rather than vanishing, and `--quiet` keeps that count while dropping the rest.
+In the library the same thing is a `Policy`, read by `Bundle::findings_at` and
+`Bundle::fails`; `Severity` is untouched either way, because what the spec says
+is not a consumer's to configure.
 
 ## Your own rules
 

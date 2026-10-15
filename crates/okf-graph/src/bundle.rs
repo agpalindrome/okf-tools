@@ -518,9 +518,28 @@ fn collect(root: &Path, path: &Path, out: &mut Bundle) -> std::io::Result<()> {
         if is_reserved(path) {
             // A reserved file is not a concept; its own structure (§8/§9) is
             // checked once the whole tree is known, so keep its text for then.
-            out.reserved.push((file, std::fs::read_to_string(path)?));
+            // One that is not UTF-8 stays fatal: no rule here names a reserved
+            // file that cannot be read, and inventing one is not this fix.
+            let text = read_text(path, &file)?.map_err(|e| {
+                std::io::Error::new(std::io::ErrorKind::InvalidData, format!("{file}: {e}"))
+            })?;
+            out.reserved.push((file, text));
         } else if is_markdown(path) {
-            let text = std::fs::read_to_string(path)?;
+            // Not UTF-8 is a document defect located at the file (§4: "Every
+            // concept is a UTF-8 markdown file"), not an IO error about the
+            // bundle. It used to abort the whole run naming the bundle root, so
+            // one stray byte hid every other finding and the file's own name.
+            let text = match read_text(path, &file)? {
+                Ok(text) => text,
+                Err(err) => {
+                    out.findings.push(Finding::new(
+                        file,
+                        Rule::NotAConcept,
+                        format!("not a concept document: {err}"),
+                    ));
+                    return Ok(());
+                }
+            };
             match Concept::parse(&text) {
                 Ok(concept) => {
                     out.findings.extend(check_concept(&file, &concept));
@@ -535,6 +554,20 @@ fn collect(root: &Path, path: &Path, out: &mut Bundle) -> std::io::Result<()> {
         }
     }
     Ok(())
+}
+
+/// Read a file as text. The outer error is IO, named by its bundle-relative
+/// path so a permission problem points at a file rather than at the bundle;
+/// the inner one is invalid UTF-8, which is the document's defect to report.
+fn read_text(path: &Path, file: &str) -> std::io::Result<Result<String, String>> {
+    let bytes =
+        std::fs::read(path).map_err(|e| std::io::Error::new(e.kind(), format!("{file}: {e}")))?;
+    Ok(String::from_utf8(bytes).map_err(|e| {
+        format!(
+            "not valid UTF-8 (first invalid byte at offset {})",
+            e.utf8_error().valid_up_to()
+        )
+    }))
 }
 
 /// The per-concept (document-level) findings for one concept, located at its

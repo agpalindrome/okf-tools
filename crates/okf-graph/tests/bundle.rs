@@ -794,5 +794,27 @@ fn an_unquoted_okf_version_is_still_examined() {
         versions[0].detail.contains("unquoted"),
         "{}",
         versions[0].detail
+/// A concept file that is not UTF-8 is a CONCEPT-1 at that file (§4), and the
+/// rest of the bundle still loads. Propagating the read error instead aborted
+/// the load with a message naming the root, not the file.
+#[cfg(unix)]
+#[test]
+fn a_file_that_is_not_utf8_is_reported_not_fatal() {
+    let dir = scratch("not-utf8");
+    write(&dir.join("good.md"), "---\ntype: Thing\n---\n\nbody\n");
+    std::fs::write(dir.join("bad.md"), b"---\ntype: Thing\n---\n\n\xff\xfe\n").expect("write");
+
+    let bundle = Bundle::load(&dir).expect("loads");
+
+    assert_eq!(bundle.len(), 1);
+    assert!(bundle.concept("good").is_some());
+    let findings = bundle.findings();
+    assert_eq!(findings.len(), 1, "{findings:?}");
+    assert_eq!(findings[0].rule, Rule::NotAConcept);
+    assert_eq!(findings[0].file, "bad.md");
+    assert!(
+        findings[0].detail.contains("UTF-8"),
+        "{}",
+        findings[0].detail
     );
 }
