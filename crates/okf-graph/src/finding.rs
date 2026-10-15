@@ -49,14 +49,16 @@ pub enum Rule {
     /// CONCEPT-5: an actor field (`generated.by`, `verified[].by`, or a source
     /// `author`) does not match the §7 convention.
     MalformedActor,
-    /// CONCEPT-6: a `sources` entry declares no `resource` (§5.1 REQUIRED).
+    /// CONCEPT-6: a `sources` entry declares no `resource` (§5.1 REQUIRED), or
+    /// `sources` is present but not a list of entries, so no entry can.
     MissingSourceResource,
-    /// CONCEPT-7: an `Attested Computation` concept declares no `runtime`
-    /// (§10.2 REQUIRED for the type).
+    /// CONCEPT-7: an `Attested Computation` concept declares no `runtime`, or
+    /// one that is not a string (§10.2 REQUIRED for the type).
     MissingRuntime,
     /// CONCEPT-8: an `Attested Computation` gives its computation in neither or
     /// both of the two §10.3 places (a `computation:` path xor a `# Computation`
-    /// body block) — it must be exactly one.
+    /// body block) — it must be exactly one — or its `computation:` is not a
+    /// path string at all.
     InvalidComputationSource,
     /// BUNDLE-3: a path-valued field (§6.2) names a bundle file that is not
     /// there. A report, not a defect — §6/§11 tolerate a broken reference.
@@ -85,12 +87,14 @@ pub enum Rule {
     /// (§9). A report — a broken link is tolerated (§6).
     DanglingLogEntry,
     /// CONCEPT-9: an Attested Computation `parameters` entry is missing `name`,
-    /// `type`, or a boolean `required` (§10.2). A report — parameters are an
-    /// optional supporting field, not §10's required core.
+    /// `type`, or a boolean `required`, or `parameters` is not a list of such
+    /// entries (§10.2). A report — parameters are an optional supporting field,
+    /// not §10's required core.
     MalformedParameter,
     /// CONCEPT-10: an Attested Computation's `executor` / `attester` is
-    /// incomplete — no `resource`, or an `executor.receipt` that is not a list
-    /// (§10.2). A report — the attestation machinery is a supporting field.
+    /// incomplete — no `resource`, an `executor.receipt` that is not a list, or
+    /// a value that is not a mapping at all (§10.2). A report — the
+    /// attestation machinery is a supporting field.
     IncompleteAttestation,
     /// CONCEPT-11: an Attested Computation's `# Computation` section is empty
     /// and there is no `computation:` path — the inline source is declared but
@@ -102,9 +106,10 @@ pub enum Rule {
     /// it, and §11's list of what a consumer must tolerate does not reach a
     /// malformed one.
     MalformedTimestamp,
-    /// CONCEPT-13: `stale_after` is present but not an RFC 3339 datetime (§5.5).
-    /// A defect, on the same reading as CONCEPT-12: §5.5 states the format, and
-    /// a staleness decision a consumer cannot make is worse than an absent one.
+    /// CONCEPT-13: `stale_after` is present but not an RFC 3339 datetime (§5.5),
+    /// including a mapping or list where a scalar should be. A defect, on the
+    /// same reading as CONCEPT-12: §5.5 states the format, and a staleness
+    /// decision a consumer cannot make is worse than an absent one.
     MalformedStaleAfter,
     /// CONCEPT-14: a §5.1 credibility signal is present but unusable — a
     /// `last_modified` or `usage_window` bound that is not an RFC 3339
@@ -119,6 +124,13 @@ pub enum Rule {
     /// worked example (Appendix A) ships a concept past its date. `--deny
     /// CONCEPT-15` is how a producer gates on it.
     StaleConcept,
+    /// CONCEPT-16: `verified` is present but not a list of `{ by, at }` events
+    /// (or the one bare mapping §5.2 allows), or an event declares no `by`.
+    /// A defect, on CONCEPT-4's reading: §5.2 gives each event a `by`, and
+    /// §5.3 derives the trust tier from nothing else, so an event without one
+    /// yields a tier from nothing. The same shapes on `generated` were already
+    /// CONCEPT-4; this closes the asymmetry.
+    MalformedVerification,
 }
 
 impl Rule {
@@ -154,6 +166,7 @@ impl Rule {
         Rule::MalformedStaleAfter,
         Rule::MalformedSourceSignal,
         Rule::StaleConcept,
+        Rule::MalformedVerification,
     ];
 
     /// The rule with this code, ASCII-case-insensitively — a code is typed by
@@ -197,6 +210,7 @@ impl Rule {
             Rule::MalformedStaleAfter => "CONCEPT-13",
             Rule::MalformedSourceSignal => "CONCEPT-14",
             Rule::StaleConcept => "CONCEPT-15",
+            Rule::MalformedVerification => "CONCEPT-16",
         }
     }
 
@@ -228,6 +242,7 @@ impl Rule {
             Rule::MalformedStaleAfter => "malformed stale_after",
             Rule::MalformedSourceSignal => "malformed source signal",
             Rule::StaleConcept => "stale concept",
+            Rule::MalformedVerification => "malformed verified",
         }
     }
 
@@ -258,7 +273,8 @@ impl Rule {
             | Rule::NonIsoLogDate
             | Rule::EmptyComputation
             | Rule::MalformedTimestamp
-            | Rule::MalformedStaleAfter => Severity::Defect,
+            | Rule::MalformedStaleAfter
+            | Rule::MalformedVerification => Severity::Defect,
         }
     }
 }
@@ -406,7 +422,7 @@ mod tests {
         }
         assert_eq!(
             Rule::ALL.len(),
-            25,
+            26,
             "a rule was added without a test update"
         );
     }
@@ -433,6 +449,7 @@ mod tests {
         assert_eq!(Rule::MalformedSourceSignal.severity(), Severity::Report);
         assert_eq!(Rule::StaleConcept.severity(), Severity::Report);
         for rule in [
+            Rule::MalformedVerification,
             Rule::NotAConcept,
             Rule::MissingType,
             Rule::DuplicateId,
