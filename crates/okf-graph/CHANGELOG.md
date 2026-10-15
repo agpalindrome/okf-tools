@@ -5,6 +5,15 @@ may break the API, and an MSRV change is one of the things that earns it.
 
 ## Unreleased
 
+### Fixed
+
+- **A body link to an existing `index.md` or `log.md` is no longer BUNDLE-2.**
+  The resolver looked the target up among concepts, and a reserved file is not
+  one, so a concept linking its own log drew "resolves to no concept" though
+  the file exists. §6.1 defines dangling by the target not existing in the
+  bundle. Such a link is now neither a report nor an edge, the treatment a
+  link to `/references/run.py` already had. Decided in #134.
+
 ### Changed
 
 - **LOG-1 reads a date heading at any level.** Only `##` was read, so the

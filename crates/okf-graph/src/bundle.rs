@@ -291,6 +291,14 @@ impl Bundle {
                         from: from.clone(),
                         to,
                     });
+                } else if self.is_reserved_file(&to) {
+                    // A link to an existing `index.md` or `log.md` is neither
+                    // dangling nor an edge. §6.1 defines dangling by the
+                    // target not existing in the bundle, and it exists; §2's
+                    // Link is concept-to-concept, and a reserved file is not a
+                    // concept. The same silence a link to `/references/run.py`
+                    // already gets: an existing non-concept file is outside
+                    // what BUNDLE-2 judges (#134).
                 } else {
                     findings.push(Finding::new(
                         format!("{from}.md"),
@@ -305,6 +313,13 @@ impl Bundle {
         }
         self.links = edges;
         self.findings.extend(findings);
+    }
+
+    /// Whether Concept ID `id` names a reserved file that is in the bundle: the
+    /// `.md` put back, the name checked, the file set consulted.
+    fn is_reserved_file(&self, id: &str) -> bool {
+        let path = format!("{id}.md");
+        is_reserved(Path::new(&path)) && self.files.contains(&path)
     }
 
     /// Resolve each concept's path-valued fields (§6.2) against the file set: a
