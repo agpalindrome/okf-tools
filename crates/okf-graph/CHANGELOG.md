@@ -3,6 +3,31 @@
 Notable changes to `okf-graph`, newest first. The crate is pre-1.0: a minor bump
 may break the API, and an MSRV change is one of the things that earns it.
 
+## Unreleased
+
+### Fixed
+
+- **`--allow <code> --quiet` no longer gives a silent green run.** The
+  silenced count was printed only in the summary line, which `--quiet` drops,
+  so the two flags together let a run that examined less than it looked like
+  say nothing. `--quiet` now keeps a one-line silenced count on stderr when it
+  is non-zero, and drops the rest of the summary as before.
+- **A bundle whose every file fails CONCEPT-1 now prints those defects and
+  exits 1.** The empty-bundle guard answered first, so the run said "no
+  concepts found" (exit 2) and the defects never printed: a one-file bundle
+  with a missing closing fence reported as a mistyped path. The guard now asks
+  only when no defect is printed, which is the case it exists for.
+- **A concept file that is not UTF-8 is a CONCEPT-1 located at that file,
+  not an abort.** The read error used to propagate and fail the whole load
+  with a message naming the bundle root, so one stray byte hid every other
+  finding and the file's own name. A reserved file that is not UTF-8 still
+  aborts, now naming the file; no rule describes a reserved file that cannot
+  be read, and this change does not invent one. Any other read error also
+  names its file.
+
+All three came out of an adversarial audit of the suite on 2026-10-15: shapes
+that parse, pass, and are silently never examined.
+
 ## 0.6.0 — 2026-09-21
 
 ### Changed
