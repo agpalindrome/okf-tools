@@ -7,6 +7,15 @@ may break the API, and an MSRV change is one of the things that earns it.
 
 ### Fixed
 
+- **The link parser follows CommonMark on four forms it misread.** A line
+  starting with a link and holding `]:` later was skipped as a reference
+  definition, hiding the link; a three-backtick line inside a four-backtick
+  fence, or `~~~` closed by backticks, ended the fence early and leaked links
+  out of code; links inside HTML comments and indented code blocks were
+  examined; and a percent-encoded target (`my%20concept.md`) did not resolve.
+  The fence rule is shared with the `log.md` and `# Computation` scanners,
+  which had the same toggle. `decode_percent` is public; a link's `target`
+  stays as written. From #135.
 - **A body link to an existing `index.md` or `log.md` is no longer BUNDLE-2.**
   The resolver looked the target up among concepts, and a reserved file is not
   one, so a concept linking its own log drew "resolves to no concept" though

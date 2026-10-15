@@ -25,19 +25,15 @@ pub(crate) struct HeadingCheck {
 pub(crate) fn check_headings(body: &str) -> HeadingCheck {
     let mut non_iso = Vec::new();
     let mut dates: Vec<&str> = Vec::new();
-    let mut in_fence = false;
+    let mut fence = crate::links::Fence::default();
     // The previous non-blank body line, for a setext underline to attach to.
     let mut previous: Option<&str> = None;
     for raw in body.lines() {
-        let line = raw.trim_start();
-        if line.starts_with("```") || line.starts_with("~~~") {
-            in_fence = !in_fence;
+        if fence.step(raw) {
             previous = None;
             continue;
         }
-        if in_fence {
-            continue;
-        }
+        let line = raw.trim_start();
         let heading = if let Some(text) = atx_heading(line) {
             previous = None;
             Some(text)

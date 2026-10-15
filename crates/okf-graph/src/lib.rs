@@ -44,7 +44,7 @@ pub use concept::{
     Status, UsageWindow, Verification,
 };
 pub use finding::{Finding, Rule, RuleId, Severity};
-pub use links::{links_in, Link, LinkKind};
+pub use links::{decode_percent, links_in, Link, LinkKind};
 pub use paths::{classify_path, resolve_path, PathKind};
 pub use policy::{Level, Policy};
 pub use provenance::Derivation;

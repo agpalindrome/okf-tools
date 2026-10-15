@@ -13,7 +13,7 @@ use std::path::Path;
 
 use crate::concept::split_frontmatter;
 use crate::index;
-use crate::links::{links_in, Link, LinkKind};
+use crate::links::{decode_percent, links_in, Link, LinkKind};
 use crate::log;
 use crate::paths::{classify_path, resolve_path, PathKind};
 use crate::provenance::{self, Derivation};
@@ -431,7 +431,9 @@ impl Bundle {
         let from = strip_md(path);
         for link in links_in(body) {
             let target = match link.kind {
-                LinkKind::BundleAbsolute | LinkKind::Relative => resolve_path(&from, &link.target),
+                LinkKind::BundleAbsolute | LinkKind::Relative => {
+                    resolve_path(&from, &decode_percent(&link.target))
+                }
                 LinkKind::External | LinkKind::Fragment => continue,
             };
             let detail = match target {
@@ -475,7 +477,9 @@ impl Bundle {
         let from = strip_md(path);
         for link in links_in(body) {
             let target = match link.kind {
-                LinkKind::BundleAbsolute | LinkKind::Relative => resolve_path(&from, &link.target),
+                LinkKind::BundleAbsolute | LinkKind::Relative => {
+                    resolve_path(&from, &decode_percent(&link.target))
+                }
                 LinkKind::External | LinkKind::Fragment => continue,
             };
             let detail = match target {
@@ -1098,7 +1102,7 @@ fn resolve_concept_target(from: &str, link: &Link) -> Option<ConceptTarget> {
     if !path.ends_with(".md") {
         return None;
     }
-    Some(match resolve_path(from, &link.target) {
+    Some(match resolve_path(from, &decode_percent(&link.target)) {
         Some(path) => ConceptTarget::Id(strip_md(&path)),
         None => ConceptTarget::Escapes,
     })
