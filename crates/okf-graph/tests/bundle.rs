@@ -794,6 +794,9 @@ fn an_unquoted_okf_version_is_still_examined() {
         versions[0].detail.contains("unquoted"),
         "{}",
         versions[0].detail
+    );
+}
+
 /// A concept file that is not UTF-8 is a CONCEPT-1 at that file (§4), and the
 /// rest of the bundle still loads. Propagating the read error instead aborted
 /// the load with a message naming the root, not the file.
