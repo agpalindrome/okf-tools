@@ -145,8 +145,9 @@ stays useful.
 - **Docs lint at 80 columns**, and emphasis style must be *consistent within
   each file* (MD049 infers it from the first use — `docs/DESIGN.md` is
   underscore, this file is asterisk). Both bite often.
-- **Prose lints against the shared house style**, as `checks.prose` — vale
-  3.17.1 over `.vale.ini` and `.vale/styles`, both vendored from
+- **Prose lints against the shared house style**, as `checks.prose` —
+  `pkgs.vale` from the locked nixpkgs (3.25.1, the house version since
+  2026-10-26) over `.vale.ini` and `.vale/styles`, both vendored from
   `agpalindrome/claude` by that repo's `scripts/sync-vale.sh`. Scope is
   authored prose: this file, both READMEs, the CHANGELOG, and `docs/`. Every
   `.md` under a `tests/fixtures` directory and under `crates/deon/examples` is

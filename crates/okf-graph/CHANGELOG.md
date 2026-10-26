@@ -158,7 +158,7 @@ shapes that parse, pass, and are silently never examined.
 
 ### Changed
 
-- **An unrecognised flag is now an error naming itself**, rather than becoming
+- **An unrecognized flag is now an error naming itself**, rather than becoming
   the bundle path. One typo used to produce three unrelated diagnoses depending
   on where it sat — that it is not a directory, that too many paths were given,
   or that no rule has that code — none of which mentioned the typo. All three

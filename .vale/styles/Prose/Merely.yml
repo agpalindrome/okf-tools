@@ -1,6 +1,33 @@
 extends: existence
-message: "'%s' is often condescending, but reads as 'merely' in 'not just'. Judge it."
+# `just` is a carve-out and `simply` is not, because only one of them is
+# load-bearing: deleting `just` from "not just X" inverts the sentence, while
+# deleting a merely-sense `simply` leaves the sentence saying what it said. See
+# `vale/README.md` in agpalindrome/claude.
+#
+# The rule fired on that exempt case anyway until 2026-09-04, because a bare
+# token match cannot see the phrase around the word. Two things make the
+# carve-out work and neither is guessable, both measured with vale 3.17.1 on
+# 2026-09-04 (agpalindrome/claude#75):
+#
+# `exceptions` is tested against the whole match, so an exempt phrase has to be
+# an alternative in the pattern before it can be excepted. With `not just` in
+# `raw` but no `exceptions` entry, the alert reads "'not just' adds emphasis" —
+# the alternation reports the exempt phrase rather than suppressing it. Both
+# halves are needed.
+#
+# `exceptions` is case-sensitive even under `ignorecase: true`. A
+# sentence-initial "Not just" was still reported until the capitalized form was
+# listed, which is why two entries cover one phrase.
+#
+# `just as` was offered as a second exemption and declined: deleting the word
+# from "just as short to read" leaves "as short to read", which says the same
+# thing, so the delete test that earns "not just" its carve-out does not earn
+# one here.
+message: "'%s' adds emphasis, not meaning, so judge whether to cut it. Where it modifies an instruction it also tells a stuck reader the thing is easy."
 level: warning
 ignorecase: true
-tokens:
-  - just
+exceptions:
+  - not just
+  - Not just
+raw:
+  - \b(?:not just|just)\b

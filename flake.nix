@@ -157,116 +157,25 @@
           };
         };
 
-      # Vale, pinned to the 3.17.1 release binary rather than taken from
-      # nixpkgs. The rules under `.vale/styles` are vendored from
-      # `~/.claude/vale` by that repo's `scripts/sync-vale.sh`, and they are
-      # written and measured against 3.17.x; the nixpkgs this flake locks
-      # carries 3.15.1. That gap is not theoretical — run over this repo's own
-      # prose on 2026-08-19, the two versions disagreed on three lines of
-      # `docs/DESIGN.md`. 3.15.1 flagged a word inside a single-line code span
-      # that 3.17.1 correctly skips, and missed two that 3.17.1 reports. Which
-      # of those is the defect is a question for `agpalindrome/claude`; that
-      # they differ at all is what settles the pin, because a linter disagreeing
-      # with CI is worse than no linter.
+      # Vale is `pkgs.vale`, the house version since 2026-10-26: 3.25.1 at
+      # the nixpkgs this flake locks (`3ec6363`), and it moves with nixpkgs
+      # from here. The rules under `.vale/styles` are vendored from
+      # `~/.claude/vale` by that repo's `scripts/sync-vale.sh` and are
+      # measured against that version, so a bump here is paired with a
+      # re-sync and a re-read of that README.
       #
-      # A recorded hash per platform keeps `nix flake check` hermetic, so this
-      # is a fixed-output fetch rather than the unpinned `curl | tar` a plain
-      # CI step would use. Hashes are the release assets' own sha256 digests,
-      # read from the GitHub API for the `v3.17.1` tag.
-      valeVersion = "3.17.1";
-      valeAssets = {
-        x86_64-linux = {
-          name = "Linux_64-bit";
-          hash = "sha256-25R/ifIpLmoDgaYd4VX2pfXLTLRgyheOpBLvYFVZzv0=";
-        };
-        aarch64-linux = {
-          name = "Linux_arm64";
-          hash = "sha256-ktkev57mnsB3N5vpXNCeZxCrM9PVurZrtILmbryA3CM=";
-        };
-        aarch64-darwin = {
-          name = "macOS_arm64";
-          hash = "sha256-gMrPhe8j9Tz913NV7EGm75muwTbxXfs1F3I0gvNVk/k=";
-        };
-      };
-      valeFor =
-        system:
-        let
-          pkgs = nixpkgs.legacyPackages.${system};
-          asset = valeAssets.${system};
-          inherit (pkgs) lib stdenv;
-          # The Linux releases are dynamically linked and carry no RUNPATH.
-          # Read from the x86_64 binary on 2026-08-19: PT_INTERP is
-          # /lib64/ld-linux-x86-64.so.2, which no Nix environment has, and
-          # DT_NEEDED lists libstdc++.so.6 and libgcc_s.so.1 beside glibc. Run
-          # bare, the exec fails with ENOENT *about the interpreter*, which
-          # every layer above renders as `vale: No such file or directory`.
-          #
-          # The binary is not patched to fix that. Running it through the
-          # pinned glibc's loader with an explicit library path leaves the
-          # upstream file byte for byte, where `autoPatchelfHook` with
-          # patchelf 0.19.2 (nixpkgs 3ec6363) wrote a `vale` that segfaulted
-          # on `--version`, so the prose check printed its file list and then
-          # `vale: terminated by signal 11`. Reproduced here on 2026-10-26 at
-          # the lock update that brought 0.19.2 in; yardmaster#374 measured
-          # the fault itself: the unpacked tarball runs as is under glibc
-          # 2.44, `--set-interpreter` then `--set-rpath` on the same file
-          # corrupts it, and patchelf 0.15.2 did not. The macOS build needs
-          # neither loader nor patch.
-          loader = stdenv.cc.bintools.dynamicLinker;
-          libraryPath = lib.makeLibraryPath [
-            stdenv.cc.libc
-            stdenv.cc.cc.lib
-          ];
-        in
-        pkgs.stdenvNoCC.mkDerivation {
-          pname = "vale";
-          version = valeVersion;
-          src = pkgs.fetchurl {
-            url = "https://github.com/vale-cli/vale/releases/download/v${valeVersion}/vale_${valeVersion}_${asset.name}.tar.gz";
-            inherit (asset) hash;
-          };
-          # The tarball is flat: LICENSE, README.md, vale.
-          sourceRoot = ".";
-          # Nothing in the fixup phase may touch the binary either: `patchELF`
-          # is the same patchelf, and strip would alter a file the install
-          # check then has to vouch for.
-          dontStrip = true;
-          dontPatchELF = true;
-          installPhase = ''
-            runHook preInstall
-            ${
-              if stdenv.hostPlatform.isLinux then
-                ''
-                  install -Dm755 vale $out/libexec/vale
-                  mkdir -p $out/bin
-                  cat > $out/bin/vale <<WRAPPER
-                  #!${pkgs.runtimeShell}
-                  exec ${loader} --library-path ${libraryPath} $out/libexec/vale "\$@"
-                  WRAPPER
-                  chmod 755 $out/bin/vale
-                ''
-              else
-                ''
-                  install -Dm755 vale $out/bin/vale
-                ''
-            }
-            runHook postInstall
-          '';
-          # A vale that cannot say its version is the failure the prose check
-          # otherwise reports as a signal 11 after the file list, so it fails
-          # here, naming the build.
-          doInstallCheck = true;
-          installCheckPhase = ''
-            runHook preInstallCheck
-            got="$($out/bin/vale --version)"
-            [ "$got" = "vale version ${valeVersion}" ] || {
-              echo "vale install check: expected 'vale version ${valeVersion}', got '$got'" >&2
-              exit 1
-            }
-            runHook postInstallCheck
-          '';
-        };
-
+      # This replaces a pin to the 3.17.1 release binary, taken on 2026-08-19
+      # because nixpkgs then carried 3.15.1 and the two disagreed on three
+      # lines of `docs/DESIGN.md`. The pin ended up costing more than the gap
+      # it closed: nixpkgs overtook it, and the binary it fetched needed a
+      # loader wrapper to run at all once patchelf 0.19.2 corrupted it under
+      # `autoPatchelfHook` (yardmaster#374, met here at the lock update that
+      # brought 0.19.2 in). `pkgs.vale` is built from source and never meets
+      # patchelf. The version itself matters: 3.23.0 fixed vale losing an
+      # alert on `*word*` after a code span in the same block, so 3.25.1
+      # reports errors 3.17.1 passed, and a specimen set in italics after a
+      # code span is now a code span (`vale/README.md` in agpalindrome/claude
+      # carries the measurement).
       # Authored prose against the vendored house style. Errors block and
       # warnings do not, which is vale's own exit code rather than a flag: it
       # is errors-only whatever `MinAlertLevel` says.
@@ -314,7 +223,7 @@
         in
         pkgs.runCommandLocal "prose-lint"
           {
-            nativeBuildInputs = [ (valeFor system) ];
+            nativeBuildInputs = [ pkgs.vale ];
           }
           ''
             cd ${src}
