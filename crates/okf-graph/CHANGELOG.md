@@ -3,7 +3,7 @@
 Notable changes to `okf-graph`, newest first. The crate is pre-1.0: a minor bump
 may break the API, and an MSRV change is one of the things that earns it.
 
-## Unreleased
+## 0.9.0 — 2026-10-26
 
 Four of the five divergences okf-model's `okfGraphPolicy` witnessed against
 0.8.0 (#147). Two tighten and two loosen, so a bundle can change verdict either
