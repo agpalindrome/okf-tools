@@ -25,6 +25,7 @@ exceptions:
   - Identity\s+Center # AWS, the short name in prose, 2026-08-12
   - Bureau\s+of\s+Labor\s+Statistics
   - Kennedy\s+Space\s+Center
+  - Bitbucket\s+Data\s+Center # Atlassian, 2026-09-15
 # `color` keeps its American spelling, like `artifact` before it. Decided
 # 2026-08-19 on agpalindrome/claude#65, after wiring the gate into okf-tools
 # produced 46 errors on writing that is correct as it stands — 46 of 49, across

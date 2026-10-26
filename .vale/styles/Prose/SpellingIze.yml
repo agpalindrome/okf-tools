@@ -3,4 +3,16 @@ message: "Oxford British takes '-ize', not '-ise', here: '%s'."
 level: error
 ignorecase: true
 raw:
-  - \b(organi|authori|reali|recogni|generali|materiali|canonicali|speciali|prioriti|summari|standardi|minimi|maximi|normali|seriali|deseriali|initiali|optimi|emphasi|characteri|categori|formali|centrali|decentrali|visuali|synchroni|parameteri|moneti|amorti|monopoli|criticali|capitali|utili)s(e|es|ed|ing|ation|ations|able)\b
+  # One entry, not several: vale concatenates a multi-entry `raw` into a single
+  # regex, so writing the two branches below as two list items produces a
+  # pattern that matches nothing and reports a clean file. See vale/README.md.
+  #
+  # Branch 1 enumerates stems, because the words that keep `-ise` in every
+  # variety are too many to exclude and RE2 has no lookbehind. `[A-Za-z]*`
+  # ahead of the stem is what lets a prefixed form match: `unrecognised`,
+  # `deprioritised`, `resynchronising`.
+  #
+  # Branch 2 needs no stem, because `-isation` is unambiguous: every English
+  # word ending that way is an `-ization` word except those built on a `-vise`
+  # verb, which `[a-uw-z]` excludes. That covers `improvisation`.
+  - \b[A-Za-z]*(?:(?:organi|authori|reali|recogni|generali|materiali|canonicali|speciali|prioriti|summari|standardi|minimi|maximi|normali|seriali|initiali|optimi|emphasi|characteri|categori|formali|centrali|visuali|synchroni|parameteri|moneti|amorti|monopoli|criticali|capitali|utili|randomi|customi|locali|harmoni|saniti|stabili|tokeni|quanti|penali|mechani|parenthesi|anonymi|apologi|zeroi)s(?:e|es|ed|er|ers|ing|ation|ations|ational|able)|[a-uw-z]isation(?:s|al)?)\b
