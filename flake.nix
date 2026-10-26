@@ -13,7 +13,6 @@
       systems = [
         "x86_64-linux"
         "aarch64-linux"
-        "x86_64-darwin"
         "aarch64-darwin"
       ];
       forAllSystems = nixpkgs.lib.genAttrs systems;
@@ -184,10 +183,6 @@
           name = "Linux_arm64";
           hash = "sha256-ktkev57mnsB3N5vpXNCeZxCrM9PVurZrtILmbryA3CM=";
         };
-        x86_64-darwin = {
-          name = "macOS_64-bit";
-          hash = "sha256-s3q5md/RQU0EG9LpTO0QMpLWNNp2+VTDhb94ncf1+Tk=";
-        };
         aarch64-darwin = {
           name = "macOS_arm64";
           hash = "sha256-gMrPhe8j9Tz913NV7EGm75muwTbxXfs1F3I0gvNVk/k=";
@@ -198,6 +193,30 @@
         let
           pkgs = nixpkgs.legacyPackages.${system};
           asset = valeAssets.${system};
+          inherit (pkgs) lib stdenv;
+          # The Linux releases are dynamically linked and carry no RUNPATH.
+          # Read from the x86_64 binary on 2026-08-19: PT_INTERP is
+          # /lib64/ld-linux-x86-64.so.2, which no Nix environment has, and
+          # DT_NEEDED lists libstdc++.so.6 and libgcc_s.so.1 beside glibc. Run
+          # bare, the exec fails with ENOENT *about the interpreter*, which
+          # every layer above renders as `vale: No such file or directory`.
+          #
+          # The binary is not patched to fix that. Running it through the
+          # pinned glibc's loader with an explicit library path leaves the
+          # upstream file byte for byte, where `autoPatchelfHook` with
+          # patchelf 0.19.2 (nixpkgs 3ec6363) wrote a `vale` that segfaulted
+          # on `--version`, so the prose check printed its file list and then
+          # `vale: terminated by signal 11`. Reproduced here on 2026-10-26 at
+          # the lock update that brought 0.19.2 in; yardmaster#374 measured
+          # the fault itself: the unpacked tarball runs as is under glibc
+          # 2.44, `--set-interpreter` then `--set-rpath` on the same file
+          # corrupts it, and patchelf 0.15.2 did not. The macOS build needs
+          # neither loader nor patch.
+          loader = stdenv.cc.bintools.dynamicLinker;
+          libraryPath = lib.makeLibraryPath [
+            stdenv.cc.libc
+            stdenv.cc.cc.lib
+          ];
         in
         pkgs.stdenvNoCC.mkDerivation {
           pname = "vale";
@@ -208,24 +227,43 @@
           };
           # The tarball is flat: LICENSE, README.md, vale.
           sourceRoot = ".";
-          # The Linux releases are dynamically linked and carry no RUNPATH, so
-          # dropping the binary into $out/bin unpatched produces one that cannot
-          # run under Nix — and the failure names the wrong thing. Read from the
-          # x86_64 release binary on 2026-08-19: PT_INTERP is
-          # /lib64/ld-linux-x86-64.so.2, which no Nix environment has, and
-          # DT_NEEDED lists libstdc++.so.6 and libgcc_s.so.1 beside glibc. The
-          # kernel then fails the exec with ENOENT *about the interpreter*, and
-          # every layer above renders that as `vale: No such file or directory`
-          # — a message that reads as a missing vale, and sent one search after
-          # the fileset instead. autoPatchelfHook supplies both the interpreter
-          # and the RUNPATH; the macOS builds need neither.
-          nativeBuildInputs = pkgs.lib.optional pkgs.stdenv.hostPlatform.isLinux pkgs.autoPatchelfHook;
-          buildInputs = pkgs.lib.optional pkgs.stdenv.hostPlatform.isLinux pkgs.stdenv.cc.cc.lib;
+          # Nothing in the fixup phase may touch the binary either: `patchELF`
+          # is the same patchelf, and strip would alter a file the install
+          # check then has to vouch for.
           dontStrip = true;
+          dontPatchELF = true;
           installPhase = ''
             runHook preInstall
-            install -Dm755 vale $out/bin/vale
+            ${
+              if stdenv.hostPlatform.isLinux then
+                ''
+                  install -Dm755 vale $out/libexec/vale
+                  mkdir -p $out/bin
+                  cat > $out/bin/vale <<WRAPPER
+                  #!${pkgs.runtimeShell}
+                  exec ${loader} --library-path ${libraryPath} $out/libexec/vale "\$@"
+                  WRAPPER
+                  chmod 755 $out/bin/vale
+                ''
+              else
+                ''
+                  install -Dm755 vale $out/bin/vale
+                ''
+            }
             runHook postInstall
+          '';
+          # A vale that cannot say its version is the failure the prose check
+          # otherwise reports as a signal 11 after the file list, so it fails
+          # here, naming the build.
+          doInstallCheck = true;
+          installCheckPhase = ''
+            runHook preInstallCheck
+            got="$($out/bin/vale --version)"
+            [ "$got" = "vale version ${valeVersion}" ] || {
+              echo "vale install check: expected 'vale version ${valeVersion}', got '$got'" >&2
+              exit 1
+            }
+            runHook postInstallCheck
           '';
         };
 
