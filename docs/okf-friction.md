@@ -102,6 +102,14 @@ on #147, with a second question: okf-graph ends the section at the next
 heading of any level, the record only at the next level-one heading, so
 `## Notes` under `# Computation` is where CONCEPT-11 and the record part.
 
+**Answered** (2026-10-26, okf-model#29). On indentation neither side moves:
+the record's witness now stands at four spaces, which both reject, and the
+record declares one to three spaces undecided rather than picking a dialect,
+since §4.2 says "standard markdown" and names none. On extent okf-graph moved:
+the section ends at the next level-one heading, as the record reads it, and
+the record says that is a pick rather than a reading, since markdown defines
+no section structure.
+
 ## 2026-07-26 — a scope descriptor is indistinguishable from a path
 
 [§5.1][s51] says a `sources[].resource` is *either* a followable path (a URL, a

@@ -559,7 +559,14 @@ impl Body {
     }
 
     /// Whether a `# Computation` heading is present but its section is empty —
-    /// no non-blank line before the next heading or the end of the body.
+    /// no non-blank line before the next level-one heading or the end of the
+    /// body.
+    ///
+    /// The section runs to the next level-one heading, not the next heading of
+    /// any level, so a `## Notes` under it is inside it and is content. Markdown
+    /// defines no section structure, so this is an outline convention rather
+    /// than a reading, and it is the one okf-model's record of okf-graph's
+    /// reading holds (#147, okf-model#29).
     ///
     /// "Empty" is measured as *content presence*, not "has a code block", so it
     /// does not depend on the §10.3 fenced-vs-indented ambiguity
@@ -588,46 +595,50 @@ impl Body {
                 }
                 continue;
             }
-            let trimmed = line.trim_start();
-            if trimmed.starts_with('#') {
-                return true; // the next heading, with no content between
+            if atx_level_one_text(line).is_some() {
+                return true; // the next level-one heading, with no content between
             }
-            if !trimmed.is_empty() {
-                return false; // any prose or indented content
+            if !line.trim().is_empty() {
+                return false; // any prose, a subheading, or indented content
             }
         }
         true // end of body with no content
     }
 }
 
-/// Whether `line` is the level-one heading `# Computation`, as CommonMark reads
-/// an ATX heading: up to three spaces of indentation, one `#`, a space or the
-/// end of the line, the text, and an optional closing run of `#`s.
+/// Whether `line` is the level-one heading `# Computation`.
 ///
 /// Level one only: §10.3 says "under `# Computation`", so `## Computation` is a
-/// different heading (#147). Four spaces or a tab make an indented code block,
-/// and `#Computation` is a paragraph, so neither is a heading of any level.
-/// One to three spaces still read as the heading, since every renderer shows
-/// them as `# Computation`; whether the record should follow is asked on #147.
+/// different heading (#147).
 fn is_computation_heading(line: &str) -> bool {
+    atx_level_one_text(line) == Some("Computation")
+}
+
+/// The text of `line` when it is a level-one ATX heading as CommonMark reads
+/// one: up to three spaces of indentation, one `#`, a space or the end of the
+/// line, the text, and an optional closing run of `#`s.
+///
+/// Four spaces or a tab make an indented code block, and `#Text` is a
+/// paragraph, so neither is a heading of any level. One to three spaces still
+/// read as the heading, since every renderer shows them as one; okf-model's
+/// record matches the line exactly and declares that case undecided
+/// (okf-model#29).
+fn atx_level_one_text(line: &str) -> Option<&str> {
     let unindented = line.trim_start_matches(' ');
     if line.len() - unindented.len() > 3 {
-        return false;
+        return None;
     }
-    let Some(rest) = unindented.strip_prefix('#') else {
-        return false;
-    };
+    let rest = unindented.strip_prefix('#')?;
     if !(rest.is_empty() || rest.starts_with([' ', '\t'])) {
-        return false;
+        return None;
     }
     let text = rest.trim();
-    let text = match text.rsplit_once(' ') {
+    Some(match text.rsplit_once(' ') {
         Some((head, tail)) if !tail.is_empty() && tail.bytes().all(|b| b == b'#') => {
             head.trim_end()
         }
         _ => text,
-    };
-    text == "Computation"
+    })
 }
 
 /// The ways a markdown file can fail to *be* a concept document — all about

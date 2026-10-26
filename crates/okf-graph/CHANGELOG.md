@@ -11,6 +11,12 @@ way.
 
 ### Changed
 
+- **The `# Computation` section runs to the next level-one heading.** CONCEPT-11
+  ended the section at the next heading of any level, so `# Computation`, then
+  `## Notes`, then a block was an empty computation. Markdown defines no
+  section structure, so the extent is an outline convention either way; this is
+  the one okf-model's record of okf-graph's reading holds, and a `##` under
+  `# Computation` is now inside it. Decided on #147 after okf-model#29.
 - **The `# Computation` heading is level one, as CommonMark reads it.**
   `## Computation`, and a heading at any deeper level, counted as the inline
   computation's section; §10.3 says "under `# Computation`", so a deeper

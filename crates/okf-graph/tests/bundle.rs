@@ -588,7 +588,9 @@ fn an_incomplete_attestation_is_reported() {
 fn an_empty_computation_section_is_a_defect() {
     let bundle = Bundle::load(&fixture("ac-empty-computation")).expect("loads");
 
-    assert_eq!(bundle.findings().len(), 1);
+    // `subheading.md` puts its block under a `## Notes` inside the section, and
+    // draws nothing (#147).
+    assert_eq!(bundle.findings().len(), 1, "{:?}", bundle.findings());
     assert_eq!(bundle.findings()[0].rule, Rule::EmptyComputation);
     assert_eq!(bundle.findings()[0].severity(), Some(Severity::Defect));
     assert_eq!(bundle.findings()[0].file, "thing.md");
