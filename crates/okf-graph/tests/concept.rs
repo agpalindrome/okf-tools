@@ -521,13 +521,21 @@ fn the_computation_heading_is_level_one_as_commonmark_reads_it() {
 }
 
 /// An empty `# Computation` section is detected; one with any content (a fence,
-/// or prose) is not; and a body with no such heading is not.
+/// or prose) is not; and a body with no such heading is not. The section runs
+/// to the next level-one heading, so a `## Notes` under it is inside it and
+/// counts as content (#147).
 #[test]
 fn an_empty_computation_section_is_detected() {
     let empty =
         Concept::parse("---\ntype: Attested Computation\n---\n# Computation\n\n# Notes\ntext\n")
             .expect("parses");
     assert!(empty.body().has_empty_computation_section());
+
+    let subheading = Concept::parse(
+        "---\ntype: Attested Computation\n---\n# Computation\n\n## Notes\n\n    SELECT 1\n",
+    )
+    .expect("parses");
+    assert!(!subheading.body().has_empty_computation_section());
 
     let filled = Concept::parse(
         "---\ntype: Attested Computation\n---\n# Computation\n\n```\nSELECT 1\n```\n",
