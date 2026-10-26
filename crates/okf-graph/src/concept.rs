@@ -544,25 +544,18 @@ impl Body {
     /// Whether the body carries a `# Computation` section (§10.3) — the inline
     /// half of the Attested-Computation computation-XOR.
     ///
-    /// Keyed on the heading's presence, at any level and outside fenced code,
-    /// **not** on the code block's style: §10.3 says "fenced", but §10.2's own
-    /// example indents it (`docs/okf-friction.md`), so requiring a fence would
-    /// miss the spec's example. Whether the section actually holds anything is
+    /// Keyed on the heading's presence, outside fenced code, **not** on the
+    /// code block's style: §10.3 says "fenced", but §10.2's own example indents
+    /// it (`docs/okf-friction.md`), so requiring a fence would miss the spec's
+    /// example. Whether the section actually holds anything is
     /// [`has_empty_computation_section`], CONCEPT-11.
     ///
     /// [`has_empty_computation_section`]: Body::has_empty_computation_section
     pub fn has_computation_section(&self) -> bool {
         let mut fence = crate::links::Fence::default();
-        for line in self.0.lines() {
-            if fence.step(line) {
-                continue;
-            }
-            let trimmed = line.trim_start();
-            if trimmed.starts_with('#') && trimmed.trim_start_matches('#').trim() == "Computation" {
-                return true;
-            }
-        }
-        false
+        self.0
+            .lines()
+            .any(|line| !fence.step(line) && is_computation_heading(line))
     }
 
     /// Whether a `# Computation` heading is present but its section is empty —
@@ -578,13 +571,9 @@ impl Body {
     pub fn has_empty_computation_section(&self) -> bool {
         let mut lines = self.0.lines();
         let mut fence = crate::links::Fence::default();
-        let found = lines.by_ref().any(|line| {
-            if fence.step(line) {
-                return false;
-            }
-            let trimmed = line.trim_start();
-            trimmed.starts_with('#') && trimmed.trim_start_matches('#').trim() == "Computation"
-        });
+        let found = lines
+            .by_ref()
+            .any(|line| !fence.step(line) && is_computation_heading(line));
         if !found {
             return false;
         }
@@ -609,6 +598,36 @@ impl Body {
         }
         true // end of body with no content
     }
+}
+
+/// Whether `line` is the level-one heading `# Computation`, as CommonMark reads
+/// an ATX heading: up to three spaces of indentation, one `#`, a space or the
+/// end of the line, the text, and an optional closing run of `#`s.
+///
+/// Level one only: §10.3 says "under `# Computation`", so `## Computation` is a
+/// different heading (#147). Four spaces or a tab make an indented code block,
+/// and `#Computation` is a paragraph, so neither is a heading of any level.
+/// One to three spaces still read as the heading, since every renderer shows
+/// them as `# Computation`; whether the record should follow is asked on #147.
+fn is_computation_heading(line: &str) -> bool {
+    let unindented = line.trim_start_matches(' ');
+    if line.len() - unindented.len() > 3 {
+        return false;
+    }
+    let Some(rest) = unindented.strip_prefix('#') else {
+        return false;
+    };
+    if !(rest.is_empty() || rest.starts_with([' ', '\t'])) {
+        return false;
+    }
+    let text = rest.trim();
+    let text = match text.rsplit_once(' ') {
+        Some((head, tail)) if !tail.is_empty() && tail.bytes().all(|b| b == b'#') => {
+            head.trim_end()
+        }
+        _ => text,
+    };
+    text == "Computation"
 }
 
 /// The ways a markdown file can fail to *be* a concept document — all about

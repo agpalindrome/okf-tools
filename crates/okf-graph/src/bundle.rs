@@ -906,16 +906,18 @@ fn check_concept(file: &str, concept: &Concept) -> Vec<Finding> {
     findings
 }
 
-/// A `CONCEPT-5` finding when `value` is present but not a well-formed actor.
+/// A `CONCEPT-5` finding when `value` is present but not a well-formed actor,
+/// or a `CONCEPT-17` report when it writes `human:` in another case.
 ///
 /// An actor is read permissively — `producer/version` or `scheme:id` — because
 /// §7's three-form list excludes its own §5.1 `team:` example. See
 /// `docs/okf-friction.md`.
 ///
-/// One scheme is not read permissively: `human:`. §7 makes it the prefix a
-/// §5.3 consumer keys off, and a case variant (`Human:`, `HUMAN:`) is not an
-/// unlisted scheme but the listed one misspelled in the way that flips a trust
-/// tier to machine-confirmed. Decided 2026-10-15 (#131).
+/// A case variant of `human:` (`Human:`, `HUMAN:`) is a legal `scheme:id` on
+/// that reading, and §5.3 makes it a non-`human:` actor rather than a malformed
+/// one, so it is not a defect (#147, reversing #131). It is still the one
+/// misspelling that flips a trust tier to machine-confirmed, which is what the
+/// report says.
 fn actor_finding(file: &str, field: &str, value: &str) -> Option<Finding> {
     if !is_actor(value) {
         return Some(Finding::new(
@@ -930,7 +932,7 @@ fn actor_finding(file: &str, field: &str, value: &str) -> Option<Finding> {
     if scheme != "human" && scheme.eq_ignore_ascii_case("human") {
         return Some(Finding::new(
             file,
-            Rule::MalformedActor,
+            Rule::MiscasedHumanActor,
             format!(
                 "`{field}` = `{value}` writes the `human:` prefix as `{scheme}:`, and §5.3 \
                  consumers key off the exact `human:` prefix (SPEC §7)"
@@ -992,19 +994,19 @@ fn timestamp_defect(field: &str, value: &str, section: &str) -> Option<String> {
 }
 
 /// A well-formed actor (§7), read permissively (see [`actor_finding`]): a
-/// `producer/version` pair, or a `scheme:id` with a non-empty scheme and id.
+/// `producer/version` pair, or a `scheme:id`, each with non-empty halves.
+///
+/// The two forms are alternatives, so a value satisfying either is an actor:
+/// `team:x/` is a `scheme:id` whose id ends in a slash, not a `producer/version`
+/// with an empty version. §7 names no character set for a scheme, so none is
+/// imposed; `a.b:x` is an actor. Both from #147.
 fn is_actor(value: &str) -> bool {
-    if let Some((producer, version)) = value.split_once('/') {
-        return !producer.is_empty() && !version.is_empty();
-    }
-    if let Some((scheme, id)) = value.split_once(':') {
-        return !scheme.is_empty()
-            && !id.is_empty()
-            && scheme
-                .chars()
-                .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-');
-    }
-    false
+    let halves = |sep| {
+        value
+            .split_once(sep)
+            .is_some_and(|(a, b)| !a.is_empty() && !b.is_empty())
+    };
+    halves(':') || halves('/')
 }
 
 /// A `*.md` file.

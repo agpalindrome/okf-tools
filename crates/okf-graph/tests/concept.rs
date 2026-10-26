@@ -484,6 +484,42 @@ fn detects_the_computation_section_fenced_or_indented() {
     assert!(!none.body().has_computation_section());
 }
 
+/// The heading is read as CommonMark reads a level-one ATX heading (#147).
+/// §10.3 says "under `# Computation`", so a deeper level is another heading;
+/// four spaces or a tab make indented code and `#Computation` a paragraph, so
+/// neither is a heading at all; one to three spaces, trailing spaces and a
+/// closing run of `#`s still render as `# Computation`.
+#[test]
+fn the_computation_heading_is_level_one_as_commonmark_reads_it() {
+    let section = |body: &str| {
+        Concept::parse(&format!("---\ntype: Attested Computation\n---\n{body}"))
+            .expect("parses")
+            .body()
+            .has_computation_section()
+    };
+    for not_it in [
+        "## Computation\n    SELECT 1\n",
+        "### Computation\n    SELECT 1\n",
+        "    # Computation\n    SELECT 1\n",
+        "\t# Computation\n    SELECT 1\n",
+        "#Computation\n    SELECT 1\n",
+        "# Computation#\n    SELECT 1\n",
+        "# Computations\n    SELECT 1\n",
+    ] {
+        assert!(!section(not_it), "{not_it:?}");
+    }
+    for it in [
+        "# Computation\n    SELECT 1\n",
+        " # Computation\n    SELECT 1\n",
+        "   # Computation\n    SELECT 1\n",
+        "# Computation  \n    SELECT 1\n",
+        "# Computation #\n    SELECT 1\n",
+        "#\tComputation\n    SELECT 1\n",
+    ] {
+        assert!(section(it), "{it:?}");
+    }
+}
+
 /// An empty `# Computation` section is detected; one with any content (a fence,
 /// or prose) is not; and a body with no such heading is not.
 #[test]

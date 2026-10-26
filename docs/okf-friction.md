@@ -48,6 +48,17 @@ schemes, not the one §7 makes load-bearing. A case variant of `human:` —
 the exact prefix and reads the variant as a machine actor. Other schemes stay
 as they were.
 
+**Reversed, and the reading widened** (2026-10-26, #147). okf-model's record
+of okf-graph's own reading, [`okfGraphPolicy`][okf-model-point], proves three
+actors conformant that 0.8.0 failed. The §5.3 argument cuts the other way: a
+consumer keying off the exact prefix makes `Human:` a legal non-`human:` actor
+that lands in the machine-confirmed tier, and the text says nothing more, so
+the lint is CONCEPT-17, a report. §7 names no character set for a scheme, so
+`a.b:x` is an actor; and its forms are alternatives, so `team:x/` is a
+`scheme:id` whose id ends in a slash rather than a `producer/version` with an
+empty version. The character-set and slash-first checks are gone rather than
+demoted: no reading of the text supports them even as lints.
+
 ## 2026-07-26 — inline computation: §10.3 says fenced, §10.2 indents
 
 [§10.3][s103] says an Attested Computation may carry its computation inline as
@@ -77,6 +88,19 @@ block," or should §10.2's example be changed to a fenced block?
 
 **Raised upstream** 2026-07-26 as
 [GoogleCloudPlatform/knowledge-catalog#235][issue-235].
+
+**Narrowed to level one** (2026-10-26, #147). 0.8.0 counted a `Computation`
+heading at any level; [`okfGraphPolicy`][okf-model-point] rejects
+`## Computation`, and §10.3's "under `# Computation`" supports it. The
+matcher now reads a level-one ATX heading as CommonMark does, which also drops
+`# Computation` indented four spaces (indented code) and `#Computation` (a
+paragraph). One divergence from the record remains, on purpose: the record
+matches the line exactly, while CommonMark lets a heading take up to three
+spaces of indentation, so `# Computation` behind one space renders as the
+heading in every reader and okf-graph counts it. Which side moves is asked
+on #147, with a second question: okf-graph ends the section at the next
+heading of any level, the record only at the next level-one heading, so
+`## Notes` under `# Computation` is where CONCEPT-11 and the record part.
 
 ## 2026-07-26 — a scope descriptor is indistinguishable from a path
 
@@ -330,6 +354,7 @@ call.
 [issue-236]: https://github.com/GoogleCloudPlatform/knowledge-catalog/issues/236
 [s62]: https://github.com/GoogleCloudPlatform/open-knowledge-format/blob/main/SPEC.md#62-path-valued-fields
 [s7]: https://github.com/GoogleCloudPlatform/open-knowledge-format/blob/main/SPEC.md#7-actor-convention
+[okf-model-point]: https://github.com/agpalindrome/okf-model/blob/1769e8a/Okf/V0_2/OkfGraph.lean
 [s51]: https://github.com/GoogleCloudPlatform/open-knowledge-format/blob/main/SPEC.md#51-provenance-sources
 [s52]: https://github.com/GoogleCloudPlatform/open-knowledge-format/blob/main/SPEC.md#52-trust-generated-and-verified
 [s102]: https://github.com/GoogleCloudPlatform/open-knowledge-format/blob/main/SPEC.md#102-contract-fields

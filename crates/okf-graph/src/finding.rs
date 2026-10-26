@@ -48,8 +48,7 @@ pub enum Rule {
     /// CONCEPT-4: a declared `generated` block carries no `by` (§5.2 REQUIRED).
     MissingGeneratedBy,
     /// CONCEPT-5: an actor field (`generated.by`, `verified[].by`, or a source
-    /// `author`) does not match the §7 convention, or writes the load-bearing
-    /// `human:` prefix in another case.
+    /// `author`) is neither a `producer/version` nor a `scheme:id` (§7).
     MalformedActor,
     /// CONCEPT-6: a `sources` entry declares no `resource` (§5.1 REQUIRED), or
     /// `sources` is present but not a list of entries, so no entry can.
@@ -134,6 +133,13 @@ pub enum Rule {
     /// yields a tier from nothing. The same shapes on `generated` were already
     /// CONCEPT-4; this closes the asymmetry.
     MalformedVerification,
+    /// CONCEPT-17: an actor writes the `human:` prefix in another case
+    /// (`Human:`, `HUMAN:`). A report, not a defect: §5.3 keys the trust tier
+    /// off the exact prefix, so the variant is a legal non-`human:` actor that
+    /// reads as machine-confirmed, and nothing in the text says more. The lint
+    /// stays because that is the one misspelling that flips a tier (#131,
+    /// demoted in #147).
+    MiscasedHumanActor,
 }
 
 impl Rule {
@@ -170,6 +176,7 @@ impl Rule {
         Rule::MalformedSourceSignal,
         Rule::StaleConcept,
         Rule::MalformedVerification,
+        Rule::MiscasedHumanActor,
     ];
 
     /// The rule with this code, ASCII-case-insensitively — a code is typed by
@@ -214,6 +221,7 @@ impl Rule {
             Rule::MalformedSourceSignal => "CONCEPT-14",
             Rule::StaleConcept => "CONCEPT-15",
             Rule::MalformedVerification => "CONCEPT-16",
+            Rule::MiscasedHumanActor => "CONCEPT-17",
         }
     }
 
@@ -246,6 +254,7 @@ impl Rule {
             Rule::MalformedSourceSignal => "malformed source signal",
             Rule::StaleConcept => "stale concept",
             Rule::MalformedVerification => "malformed verified",
+            Rule::MiscasedHumanActor => "miscased human: prefix",
         }
     }
 
@@ -262,7 +271,8 @@ impl Rule {
             | Rule::MalformedParameter
             | Rule::IncompleteAttestation
             | Rule::MalformedSourceSignal
-            | Rule::StaleConcept => Severity::Report,
+            | Rule::StaleConcept
+            | Rule::MiscasedHumanActor => Severity::Report,
             Rule::NotAConcept
             | Rule::MissingType
             | Rule::DuplicateId
@@ -425,7 +435,7 @@ mod tests {
         }
         assert_eq!(
             Rule::ALL.len(),
-            26,
+            27,
             "a rule was added without a test update"
         );
     }
@@ -451,6 +461,7 @@ mod tests {
         assert_eq!(Rule::IncompleteAttestation.severity(), Severity::Report);
         assert_eq!(Rule::MalformedSourceSignal.severity(), Severity::Report);
         assert_eq!(Rule::StaleConcept.severity(), Severity::Report);
+        assert_eq!(Rule::MiscasedHumanActor.severity(), Severity::Report);
         for rule in [
             Rule::MalformedVerification,
             Rule::NotAConcept,
