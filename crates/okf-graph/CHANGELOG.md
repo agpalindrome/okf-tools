@@ -3,6 +3,36 @@
 Notable changes to `okf-graph`, newest first. The crate is pre-1.0: a minor bump
 may break the API, and an MSRV change is one of the things that earns it.
 
+## Unreleased
+
+Four of the five divergences okf-model's `okfGraphPolicy` witnessed against
+0.8.0 (#147). Two tighten and two loosen, so a bundle can change verdict either
+way.
+
+### Changed
+
+- **The `# Computation` heading is level one, as CommonMark reads it.**
+  `## Computation`, and a heading at any deeper level, counted as the inline
+  computation's section; §10.3 says "under `# Computation`", so a deeper
+  heading is another heading and the concept is CONCEPT-8 (neither way). The
+  matcher now reads an ATX heading as CommonMark does: up to three spaces of
+  indentation, one `#`, a space, the text, an optional closing run of `#`s.
+  So `# Computation` indented four spaces (indented code) and `#Computation`
+  (a paragraph), both accepted before, are no heading at all. One to three
+  leading spaces still count; okf-model's record reads the line exactly, and
+  which side moves is asked on #147.
+- **A `human:` prefix in another case is CONCEPT-17, a report, not CONCEPT-5.**
+  0.8.0 made `Human:ahormati` a defect (#131). §5.3 keys the trust tier off the
+  exact prefix, which makes the variant a legal non-`human:` actor that reads
+  as machine-confirmed, not a malformed one, and nothing in the text says more.
+  The lint stays, because that is the one misspelling that flips a tier, and
+  `--deny CONCEPT-17` restores the 0.8.0 verdict.
+- **Any `scheme:id` is an actor.** A scheme holding a character outside ASCII
+  letters, digits, `_` and `-` was CONCEPT-5; §7 names no character set, so
+  `a.b:x` passes. And the two §7 forms are alternatives: `team:x/` was split at
+  the slash first, found an empty version and failed, and is now the
+  `scheme:id` it is.
+
 ## 0.8.0 — 2026-10-15
 
 ### Fixed

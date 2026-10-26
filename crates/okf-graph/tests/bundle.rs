@@ -227,26 +227,49 @@ fn a_non_rfc_3339_timestamp_is_reported() {
 }
 
 /// A `by` that is a bare token, not `producer/version` or `scheme:id`, is
-/// reported as CONCEPT-5 (§7). So is a `human:` prefix in another case: a
-/// §5.3 consumer keys off the exact prefix, so `Human:` reads as a machine
-/// actor and flips the trust tier (#131).
+/// CONCEPT-5 (§7). A `human:` prefix in another case is CONCEPT-17, a report:
+/// a §5.3 consumer keys off the exact prefix, so `Human:` is a legal actor that
+/// reads as machine-confirmed (#131, demoted in #147). A scheme with a `.` and
+/// an id ending in `/` are actors and draw nothing: §7 names no character set,
+/// and its forms are alternatives, so `team:x/` is a `scheme:id` rather than a
+/// `producer/version` with an empty version (#147).
 #[test]
 fn a_malformed_actor_is_reported() {
     let bundle = Bundle::load(&fixture("bad-actor")).expect("loads");
 
-    let mut by_file: Vec<(&str, &str)> = bundle
+    let mut by_file: Vec<(&str, &str, &str)> = bundle
         .findings()
         .iter()
-        .inspect(|f| assert_eq!(f.rule, Rule::MalformedActor, "{f:?}"))
-        .map(|f| (f.file.as_str(), f.detail.as_str()))
+        .map(|f| (f.file.as_str(), f.rule.code(), f.detail.as_str()))
         .collect();
     by_file.sort();
     assert_eq!(by_file.len(), 3, "{by_file:?}");
     assert_eq!(by_file[0].0, "case.md");
-    assert!(by_file[0].1.contains("`Human:`"), "{}", by_file[0].1);
+    assert_eq!(by_file[0].1, Rule::MiscasedHumanActor.code());
+    assert!(by_file[0].2.contains("`Human:`"), "{}", by_file[0].2);
     assert_eq!(by_file[1].0, "case.md");
-    assert!(by_file[1].1.contains("`HUMAN:`"), "{}", by_file[1].1);
+    assert_eq!(by_file[1].1, Rule::MiscasedHumanActor.code());
+    assert!(by_file[1].2.contains("`HUMAN:`"), "{}", by_file[1].2);
     assert_eq!(by_file[2].0, "thing.md");
+    assert_eq!(by_file[2].1, Rule::MalformedActor.code());
+    assert!(by_file.iter().all(|f| f.0 != "unusual.md"), "{by_file:?}");
+}
+
+/// An Attested Computation whose heading is `## Computation`, or `# Computation`
+/// indented four spaces, provides its computation in neither of §10.3's two
+/// ways, so each is CONCEPT-8 (#147). Before 0.9.0 both passed.
+#[test]
+fn a_computation_heading_not_at_level_one_is_not_the_section() {
+    let bundle = Bundle::load(&fixture("ac-heading-level")).expect("loads");
+
+    let mut files: Vec<&str> = bundle
+        .findings()
+        .iter()
+        .inspect(|f| assert_eq!(f.rule, Rule::InvalidComputationSource, "{f:?}"))
+        .map(|f| f.file.as_str())
+        .collect();
+    files.sort();
+    assert_eq!(files, ["indented.md", "level-two.md"]);
 }
 
 /// A `sources` entry with no `resource` is reported as CONCEPT-6 (§5.1).
