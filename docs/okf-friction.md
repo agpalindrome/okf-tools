@@ -285,6 +285,44 @@ okf-graph's resolution in `paths.rs` has to change. Neither had landed by
 [okf-31]: https://github.com/GoogleCloudPlatform/open-knowledge-format/pull/31
 [s63]: https://github.com/GoogleCloudPlatform/open-knowledge-format/blob/main/SPEC.md#63-the-references-convention
 
+## 2026-10-26 — three proposed pins, none landed, all tolerated
+
+Three open proposals would add an optional field that names the state a
+concept was written from or checked against, where today only a timestamp
+records it:
+
+- [knowledge-catalog#437][kc-437] (2026-10-19): `revision` on `generated` and
+  on each `verified` event, pinning the state of `resource` the check was made
+  against. A URL `resource` that changes the day after a `human:` confirmation
+  leaves no trace in the event today.
+- [open-knowledge-format#46][okf-46] (2026-10-25): `revision` on a `sources`
+  entry, the same idea per source, as a commit id, page version or ETag.
+- [open-knowledge-format#45][okf-45] (2026-10-25): `digest` on a `sources`
+  entry, a content hash such as `sha256:…`, kept apart from `revision` so a
+  name and a fingerprint are not one field.
+
+All three are additive under §12 and none is in the text. They are logged
+because each sits inside a block okf-graph already reads, so adoption by a
+producer ahead of the spec is the case to know the answer for.
+
+**How okf-graph handles it.** Measured on 0.8.0, 2026-10-26: a bundle carrying
+`revision` on a `verified` event and both `digest` and `revision` on a
+`sources` entry draws no defect and no report. §11's tolerance of unknown keys
+reaches inside these blocks, so an early adopter passes. Nothing checks the
+value, which is right while no text says what the value is.
+
+**What changes if they land.** A `digest` has a stated shape, so a malformed
+one is the same class as a malformed `last_modified`, CONCEPT-14's. A
+`revision` is a name the source gives its state, which no bundle-local check
+can test, so it stays uninspected. Neither is work until the text says so.
+
+**Not raised upstream**; whether to comment on any of the three is the owner's
+call.
+
+[kc-437]: https://github.com/GoogleCloudPlatform/knowledge-catalog/issues/437
+[okf-45]: https://github.com/GoogleCloudPlatform/open-knowledge-format/issues/45
+[okf-46]: https://github.com/GoogleCloudPlatform/open-knowledge-format/issues/46
+
 [pr232]: https://github.com/GoogleCloudPlatform/knowledge-catalog/pull/232
 [s11]: https://github.com/GoogleCloudPlatform/open-knowledge-format/blob/main/SPEC.md#11-conformance
 [issue]: https://github.com/GoogleCloudPlatform/knowledge-catalog/issues/234
