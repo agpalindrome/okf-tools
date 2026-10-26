@@ -932,3 +932,56 @@ fn the_link_parser_reads_commonmark_forms() {
         .collect();
     assert_eq!(edges, [("note", "my concept")]);
 }
+
+/// The spec's own worked example (Appendix A at `ad30107c`), as written, with
+/// stubs for the four `references/` files the appendix names and leaves empty.
+/// It is the bundle #145 asks about: it writes `author: team:…` against §7's
+/// three forms, indents its `# Computation` against §10.3's "fenced", and
+/// gives `verified` as one bare mapping. No defect. The reports are the
+/// already-logged §6.2 friction — `references/…` written root-relative and
+/// resolved from `computations/` — one `sources[].resource` that is neither a
+/// URL nor a file, and `profit.md` past its `stale_after`.
+#[test]
+fn the_spec_worked_example_draws_reports_and_no_defect() {
+    let bundle = Bundle::load(&fixture("appendix-a")).expect("loads");
+    assert_eq!(bundle.len(), 5);
+
+    let defects: Vec<_> = bundle
+        .findings()
+        .iter()
+        .filter(|f| f.severity() == Some(Severity::Defect))
+        .collect();
+    assert!(defects.is_empty(), "{defects:?}");
+
+    let mut reports: Vec<(&str, &str)> = bundle
+        .findings()
+        .iter()
+        .inspect(|f| assert_eq!(f.rule, Rule::DanglingPath, "{f:?}"))
+        .map(|f| {
+            let path = f.detail.split('`').nth(3).unwrap_or("");
+            (f.file.as_str(), path)
+        })
+        .collect();
+    reports.sort();
+    assert_eq!(
+        reports,
+        [
+            (
+                "computations/profit.md",
+                "references/attesters/dbt-binding.py"
+            ),
+            ("computations/profit.md", "references/skills/run-dbt.md"),
+            ("computations/revenue.md", "dashboards/exec-revenue"),
+            (
+                "computations/revenue.md",
+                "references/attesters/sql-equality.py"
+            ),
+            ("computations/revenue.md", "references/skills/run-on-bq.md"),
+        ]
+    );
+
+    let stale = bundle.stale_as_of(Timestamp::parse("2026-06-20T00:00:00Z").unwrap());
+    assert_eq!(stale.len(), 1, "{stale:?}");
+    assert_eq!(stale[0].file, "computations/profit.md");
+    assert_eq!(stale[0].rule, Rule::StaleConcept);
+}
